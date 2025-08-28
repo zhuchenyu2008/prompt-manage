@@ -299,6 +299,28 @@ def toggle_pin(prompt_id):
     return redirect(request.referrer or url_for('index'))
 
 
+@app.route('/prompt/<int:prompt_id>/delete', methods=['POST'])
+def delete_prompt(prompt_id):
+    # 删除提示词：先删关联版本，再删提示词本身
+    conn = get_db()
+    row = conn.execute("SELECT id, name FROM prompts WHERE id=?", (prompt_id,)).fetchone()
+    if not row:
+        conn.close()
+        flash('提示词不存在或已被删除', 'error')
+        return redirect(url_for('index'))
+
+    try:
+        conn.execute("DELETE FROM versions WHERE prompt_id=?", (prompt_id,))
+        conn.execute("DELETE FROM prompts WHERE id=?", (prompt_id,))
+        conn.commit()
+        flash('已删除提示词及其所有版本', 'success')
+    except Exception:
+        conn.rollback()
+        flash('删除失败，请重试', 'error')
+    finally:
+        conn.close()
+    return redirect(url_for('index'))
+
 @app.route('/prompt/<int:prompt_id>/rollback/<int:version_id>', methods=['POST'])
 def rollback_version(prompt_id, version_id):
     bump_kind = request.form.get('bump_kind', 'patch')

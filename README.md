@@ -1,8 +1,6 @@
 # Prompt 管理器
 
-一个功能完整的本地提示词管理系统，支持版本控制、搜索、标签管理、导入导出等功能。采用 Python + Flask + SQLite 构建，无需外部依赖，开箱即用。
-
-由 claude code | codeX 协助完成。
+一个功能完整的本地提示词管理系统，支持版本控制、搜索、标签管理、导入导出等企业级功能。采用 Flask + SQLite 构建，无需外部依赖，开箱即用。
 
 ## ✨ 核心功能
 
@@ -42,25 +40,63 @@
 
 ## 🚀 快速开始
 
-### 环境要求
-- Python 3.9+
-- 无需其他依赖，仅使用 Python 标准库
+### 方式一：Docker 运行 (推荐)
 
-### 安装运行
+#### 环境要求
+- Docker 和 Docker Compose
 
-1. **克隆或下载项目**
+#### 使用 Docker Compose
+
+1. **克隆项目**
    ```bash
-   # 如果是 git 仓库
    git clone <repository-url>
    cd prompt
    ```
 
 2. **启动应用**
    ```bash
+   # 启动服务
+   docker-compose up
+   # 或后台运行
+   docker-compose up -d
+   ```
+   访问：http://localhost:3501
+
+#### 使用单独的 Docker
+
+```bash
+# 构建镜像
+docker build -t prompt-manager .
+
+# 运行容器
+docker run -d -p 3501:3501 -v prompt-data:/app/data prompt-manager
+```
+
+### 方式二：本地 Python 运行
+
+#### 环境要求
+- Python 3.9+
+- Flask 框架及相关依赖
+
+#### 安装运行
+
+1. **克隆或下载项目**
+   ```bash
+   git clone <repository-url>
+   cd prompt
+   ```
+
+2. **安装依赖**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **启动应用**
+   ```bash
    python app.py
    ```
 
-3. **访问应用**
+4. **访问应用**
    打开浏览器访问：http://localhost:3501
 
 > **注意**：首次运行会自动创建 `data.sqlite3` 数据库文件，无需手动配置。
@@ -70,7 +106,11 @@
 ```
 prompt/
 ├── app.py              # Flask 应用主文件
+├── requirements.txt    # Python 依赖文件
 ├── data.sqlite3        # SQLite 数据库文件(自动创建)
+├── Dockerfile          # Docker 镜像配置
+├── docker-compose.yml  # Docker Compose 配置文件
+├── .dockerignore       # Docker 构建忽略文件
 ├── templates/          # HTML 模板
 │   ├── layout.html     # 基础布局模板
 │   ├── index.html      # 首页(列表视图)
@@ -175,6 +215,7 @@ app.run(host='0.0.0.0', port=3501, debug=True)
 - **前端**: 原生 HTML/CSS/JavaScript
 - **样式**: CSS 变量 + Flexbox/Grid 布局
 - **图标**: Font Awesome
+- **依赖**: Flask, Werkzeug
 
 ### 特色实现
 - **主题系统**: 使用 CSS 变量和 `data-theme` 属性
@@ -185,9 +226,10 @@ app.run(host='0.0.0.0', port=3501, debug=True)
 ## 🔧 故障排除
 
 ### 常见问题
-1. **端口占用**：修改 `app.py` 中的端口号
-2. **权限问题**：确保对当前目录有读写权限
-3. **数据库损坏**：删除 `data.sqlite3` 重新生成
+1. **依赖缺失**：运行 `pip install flask` 安装 Flask 框架
+2. **端口占用**：修改 `app.py` 中的端口号
+3. **权限问题**：确保对当前目录有读写权限
+4. **数据库损坏**：删除 `data.sqlite3` 重新生成
 
 ### 重置系统
 如需重置所有数据，删除 `data.sqlite3` 文件后重启应用即可。
@@ -201,3 +243,10 @@ app.run(host='0.0.0.0', port=3501, debug=True)
 - ✅ 简化的用户界面
 - ✅ 增强的颜色主题系统
 
+## 📄 许可证
+
+本项目采用 MIT 许可证，可自由使用和修改。
+
+---
+
+**提示**: 这是一个完全本地的应用，您的所有数据都存储在本地，不会上传到任何云端服务器。
