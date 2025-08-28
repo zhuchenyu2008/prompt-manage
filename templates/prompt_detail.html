@@ -130,6 +130,12 @@
             <i class="fas fa-arrow-left"></i>
             返回列表
           </a>
+          {% if prompt %}
+            <button type="button" class="btn ghost" onclick="triggerDelete()" style="border-color: var(--del); color: var(--del);">
+              <i class="fas fa-trash"></i>
+              删除提示词
+            </button>
+          {% endif %}
         </div>
         
         <div class="actions-version">
@@ -177,6 +183,11 @@
       </div>
     </div>
   </div>
+
+  {% if prompt %}
+  <!-- Hidden delete form (separate from edit form to avoid nested forms) -->
+  <form id="deleteForm" method="post" action="{{ url_for('delete_prompt', prompt_id=prompt['id']) }}"></form>
+  {% endif %}
 
   <style>
     .page-header {
@@ -777,6 +788,18 @@
           submitBtn.innerHTML = submitBtn.dataset.originalText;
         }, 5000);
       });
+    }
+
+    // 删除确认：仅一次确认
+    function confirmDelete() {
+      return confirm('确定要删除该提示词及其所有版本吗？此操作不可恢复。');
+    }
+
+    function triggerDelete() {
+      if (confirmDelete()) {
+        const f = document.getElementById('deleteForm');
+        if (f) f.submit();
+      }
     }
     
     function autoResizeTextarea(textarea) {
