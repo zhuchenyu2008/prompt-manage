@@ -1,0 +1,38 @@
+{% extends 'layout.html' %}
+{% block title %}Diff - Prompt 管理器{% endblock %}
+{% block content %}
+  <section class="diff-toolbar">
+    <form method="get" class="diff-select" action="{{ url_for('diff_view', prompt_id=prompt['id']) }}">
+      <label>左（旧）
+        <select name="left">
+          {% for v in versions %}
+            <option value="{{ v['id'] }}" {% if left and v['id']==left['id'] %}selected{% endif %}>{{ v['version'] }} · {{ (v['created_at'] or '')[:19].replace('T',' ') }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>右（新）
+        <select name="right">
+          {% for v in versions %}
+            <option value="{{ v['id'] }}" {% if right and v['id']==right['id'] %}selected{% endif %}>{{ v['version'] }} · {{ (v['created_at'] or '')[:19].replace('T',' ') }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>模式
+        <select name="mode">
+          <option value="word" {% if mode=='word' %}selected{% endif %}>词级</option>
+          <option value="line" {% if mode=='line' %}selected{% endif %}>行级</option>
+        </select>
+      </label>
+      <button class="btn" type="submit">刷新</button>
+      <a class="btn ghost" href="{{ url_for('prompt_detail', prompt_id=prompt['id']) }}">返回</a>
+    </form>
+  </section>
+
+  <section class="diff-view">
+    <h3>{{ prompt['name'] }}</h3>
+    <div class="diff-container">
+      {{ diff_html|safe }}
+    </div>
+  </section>
+{% endblock %}
+

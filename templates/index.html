@@ -1,0 +1,613 @@
+{% extends 'layout.html' %}
+{% block title %}列表 - Prompt 管理器{% endblock %}
+{% block content %}
+  <section class="toolbar">
+    <form method="get" action="{{ url_for('index') }}" class="search-form">
+      <div class="search-input-wrapper">
+        <i class="fas fa-search"></i>
+        <input type="text" name="q" value="{{ q }}" placeholder="搜索（名称/来源/备注/标签/当前内容）" />
+      </div>
+      <div class="search-controls">
+        <select name="sort" title="排序" class="sort-select">
+          <option value="updated" {% if sort=='updated' %}selected{% endif %}>最近修改</option>
+          <option value="created" {% if sort=='created' %}selected{% endif %}>创建时间</option>
+          <option value="name" {% if sort=='name' %}selected{% endif %}>名称 A-Z</option>
+          <option value="tags" {% if sort=='tags' %}selected{% endif %}>标签</option>
+        </select>
+        <button class="btn search-btn" type="submit">
+          <i class="fas fa-filter"></i> 应用
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <section class="create-section">
+    <div class="create-actions">
+      <a href="{{ url_for('new_prompt') }}" class="btn primary create-btn">
+        <i class="fas fa-plus"></i> 新建提示词
+      </a>
+    </div>
+  </section>
+
+  <div class="content-section">
+    {% if prompts|length == 0 %}
+      <div class="empty-state">
+        <div class="empty-icon">
+          <i class="fas fa-inbox"></i>
+        </div>
+        <h3 class="empty-title">暂无提示词</h3>
+        <p class="empty-description">
+          点击"新建提示词"开始创建您的第一个提示词
+        </p>
+        <a href="{{ url_for('new_prompt') }}" class="btn primary">
+          <i class="fas fa-plus"></i> 创建第一个提示词
+        </a>
+      </div>
+    {% else %}
+      <div class="stats-bar">
+        <div class="stat-item">
+          <i class="fas fa-file-alt"></i>
+          <span class="stat-label">总计</span>
+          <span class="stat-value">{{ prompts|length }}</span>
+        </div>
+        <div class="stat-item">
+          <i class="fas fa-star"></i>
+          <span class="stat-label">置顶</span>
+          <span class="stat-value">{{ prompts|selectattr('pinned')|list|length }}</span>
+        </div>
+        <div class="stat-item">
+          <i class="fas fa-tag"></i>
+          <span class="stat-label">标签</span>
+          <span class="stat-value">{{ tag_suggestions|length }}</span>
+        </div>
+      </div>
+
+      <div class="list">
+        {% for p in prompts %}
+          <article class="card" style="animation-delay: {{ loop.index * 0.1 }}s;">
+            <div class="card-header">
+              <div class="card-title-area">
+                <a href="{{ url_for('prompt_detail', prompt_id=p['id']) }}" class="card-title">
+                  <i class="fas fa-file-alt"></i>
+                  <span class="title-text">{{ p['name'] }}</span>
+                </a>
+                <div class="card-actions">
+                  <form method="post" action="{{ url_for('toggle_pin', prompt_id=p['id']) }}" class="inline-form">
+                    <button class="icon-btn" title="置顶/取消置顶" aria-label="置顶" type="submit">
+                      {% if p['pinned'] %}
+                        <i class="fas fa-star" style="color: var(--star);"></i>
+                      {% else %}
+                        <i class="far fa-star"></i>
+                      {% endif %}
+                    </button>
+                  </form>
+                </div>
+              </div>
+              
+              <div class="card-meta">
+                <div class="meta-item">
+                  <i class="fas fa-link"></i>
+                  <span class="meta-label">来源：</span>
+                  <span class="meta-value">{{ p['source'] or '—' }}</span>
+                </div>
+                <div class="meta-item">
+                  <i class="fas fa-clock"></i>
+                  <span class="meta-label">修改：</span>
+                  <span class="meta-value">{{ (p['updated_at'] or '')[:19].replace('T',' ') }}</span>
+                </div>
+                <div class="meta-item">
+                  <i class="fas fa-code-branch"></i>
+                  <span class="meta-label">版本：</span>
+                  <span class="meta-value">{{ p['current_version'] or '—' }}</span>
+                </div>
+              </div>
+            </div>
+
+            {% set tags = (p['tags'] and (p['tags']|loads)) or [] %}
+            {% if tags %}
+              <div class="card-tags">
+                {% for t in tags %}
+                  <span class="tag">
+                    <i class="fas fa-tag"></i>
+                    {{ t }}
+                  </span>
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            {% if p['notes'] %}
+              <div class="card-notes">
+                <i class="fas fa-sticky-note"></i>
+                <span class="notes-text">{{ p['notes'] }}</span>
+              </div>
+            {% endif %}
+
+            {% if p['current_content'] %}
+              <div class="card-preview">
+                <div class="preview-header">
+                  <div class="preview-title">
+                    <i class="fas fa-eye"></i>
+                    <span>内容预览</span>
+                  </div>
+                  <button class="copy-preview-btn" onclick="copyPreviewContent(this)" data-content="{{ p['current_content']|e }}" title="复制预览内容">
+                    <i class="fas fa-copy"></i>
+                  </button>
+                </div>
+                <div class="preview-content">
+                  {{ p['current_content'][:150] }}
+                  {% if p['current_content']|length > 150 %}...{% endif %}
+                </div>
+              </div>
+            {% endif %}
+          </article>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+
+  <style>
+    .toolbar {
+      display: flex;
+      justify-content: center;
+      margin-bottom: var(--spacing-2xl);
+      padding: var(--spacing-xl);
+      background: var(--card);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border);
+    }
+    
+    .search-form {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-md);
+      align-items: stretch;
+      width: 100%;
+      max-width: 600px;
+    }
+    
+    .search-controls {
+      display: flex;
+      gap: var(--spacing-md);
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    
+    .create-section {
+      display: flex;
+      justify-content: center;
+      margin-bottom: var(--spacing-2xl);
+      width: 100%;
+    }
+    
+    .create-actions {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+      max-width: 1200px;
+    }
+    
+    .create-btn {
+      width: 100%;
+      max-width: 1200px;
+      padding: var(--spacing-lg);
+      font-size: var(--font-size-lg);
+      justify-content: center;
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      border-radius: var(--radius-xl);
+    }
+    
+    .search-input-wrapper {
+      position: relative;
+      width: 100%;
+    }
+    
+    .search-input-wrapper i {
+      position: absolute;
+      left: var(--spacing-md);
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      pointer-events: none;
+    }
+    
+    .search-input-wrapper input {
+      width: 100%;
+      padding: var(--spacing-md) var(--spacing-md) var(--spacing-md) calc(var(--spacing-md) + 24px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: var(--bg);
+      color: var(--fg);
+      font-size: var(--font-size-base);
+      transition: all 0.3s ease;
+    }
+    
+    .search-input-wrapper input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
+    }
+    
+    .sort-select {
+      padding: var(--spacing-md) var(--spacing-lg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: var(--bg);
+      color: var(--fg);
+      font-size: var(--font-size-base);
+      cursor: pointer;
+      transition: all 0.3s ease;
+      min-width: 140px;
+    }
+    
+    .sort-select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
+    }
+    
+    .search-btn {
+      padding: var(--spacing-md) var(--spacing-lg);
+      background: var(--primary);
+      color: var(--text-on-primary);
+      border: none;
+      border-radius: var(--radius-lg);
+      font-size: var(--font-size-base);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      white-space: nowrap;
+    }
+    
+    .search-btn:hover {
+      background: color-mix(in srgb, var(--primary) 90%, var(--card));
+    }
+    
+    .content-section {
+      margin-bottom: var(--spacing-2xl);
+    }
+    
+    .stats-bar {
+      display: flex;
+      gap: var(--spacing-xl);
+      margin-bottom: var(--spacing-2xl);
+      padding: var(--spacing-lg);
+      background: var(--card);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border);
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      font-size: var(--font-size-sm);
+    }
+    
+    .stat-item i {
+      font-size: var(--font-size-lg);
+      color: var(--primary);
+    }
+    
+    .stat-label {
+      color: var(--muted);
+      font-weight: 500;
+    }
+    
+    .stat-value {
+      font-weight: 700;
+      color: var(--primary);
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: var(--spacing-4xl);
+      border: 2px dashed var(--border);
+      border-radius: var(--radius-xl);
+      background: color-mix(in srgb, var(--card) 50%, transparent);
+    }
+    
+    .empty-icon {
+      font-size: 4rem;
+      color: var(--muted);
+      opacity: 0.5;
+      margin-bottom: var(--spacing-lg);
+    }
+    
+    .empty-title {
+      font-size: var(--font-size-xl);
+      font-weight: 600;
+      color: var(--fg);
+      margin: 0 0 var(--spacing-sm) 0;
+    }
+    
+    .empty-description {
+      font-size: var(--font-size-base);
+      color: var(--muted);
+      margin: 0 0 var(--spacing-xl) 0;
+    }
+    
+    .card-header {
+      margin-bottom: var(--spacing-md);
+    }
+    
+    .card-title-area {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--spacing-sm);
+    }
+    
+    .card-title {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      font-size: var(--font-size-lg);
+      font-weight: 600;
+      color: var(--primary);
+      text-decoration: none;
+      flex: 1;
+      margin-right: var(--spacing-md);
+    }
+    
+    .card-title:hover {
+      text-decoration: underline;
+    }
+    
+    .card-title i {
+      opacity: 0.8;
+    }
+    
+    .title-text {
+      flex: 1;
+    }
+    
+    .card-actions {
+      display: flex;
+      gap: var(--spacing-xs);
+    }
+    
+    .card-meta {
+      display: flex;
+      gap: var(--spacing-lg);
+      flex-wrap: wrap;
+      font-size: var(--font-size-xs);
+      color: var(--muted);
+    }
+    
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+    }
+    
+    .meta-item i {
+      opacity: 0.7;
+    }
+    
+    .meta-label {
+      font-weight: 500;
+    }
+    
+    .card-tags {
+      display: flex;
+      gap: var(--spacing-sm);
+      margin-top: var(--spacing-md);
+      flex-wrap: wrap;
+    }
+    
+    .card-notes {
+      margin-top: var(--spacing-md);
+      font-size: var(--font-size-sm);
+      color: var(--fg);
+      line-height: 1.6;
+      display: flex;
+      align-items: flex-start;
+      gap: var(--spacing-xs);
+    }
+    
+    .card-notes i {
+      opacity: 0.7;
+      margin-top: 2px;
+    }
+    
+    .card-preview {
+      margin-top: var(--spacing-md);
+      padding: var(--spacing-md);
+      background: color-mix(in srgb, var(--bg) 30%, var(--card));
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+    }
+    
+    .preview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--spacing-xs);
+      font-size: var(--font-size-xs);
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: var(--spacing-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .preview-title {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+    }
+    
+    .copy-preview-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-xs);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .copy-preview-btn:hover {
+      color: var(--primary);
+      background: color-mix(in srgb, var(--primary) 10%, transparent);
+    }
+    
+    .copy-preview-btn.copied {
+      color: var(--success);
+    }
+    
+    .preview-content {
+      font-size: var(--font-size-xs);
+      color: var(--fg);
+      line-height: 1.5;
+      font-family: 'Consolas', 'Monaco', 'SF Mono', monospace;
+    }
+    
+    .inline-form {
+      display: inline;
+    }
+    
+    @media (max-width: 768px) {
+      .toolbar {
+        padding: var(--spacing-lg);
+        margin-bottom: var(--spacing-xl);
+      }
+      
+      .search-form {
+        max-width: none;
+      }
+      
+      .search-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--spacing-sm);
+      }
+      
+      .sort-select {
+        min-width: auto;
+      }
+      
+      .search-btn {
+        width: 100%;
+      }
+      
+      .create-section {
+        margin-bottom: var(--spacing-lg);
+      }
+      
+      .create-actions {
+        max-width: none;
+        padding: 0 var(--spacing-md);
+      }
+      
+      .create-btn {
+        max-width: none;
+        font-size: var(--font-size-base);
+        padding: var(--spacing-md);
+      }
+      
+      .stats-bar {
+        gap: var(--spacing-lg);
+        padding: var(--spacing-md);
+      }
+      
+      .card-title-area {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-sm);
+      }
+      
+      .card-title {
+        margin-right: 0;
+      }
+      
+      .card-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-xs);
+      }
+      
+      .card-preview {
+        margin-top: var(--spacing-sm);
+      }
+    }
+  </style>
+  
+  <script>
+    async function copyPreviewContent(button) {
+      const content = button.getAttribute('data-content');
+      
+      if (!content) {
+        return;
+      }
+      
+      // Check if clipboard API is available
+      if (!navigator.clipboard) {
+        fallbackCopyTextToClipboard(content, button);
+        return;
+      }
+      
+      try {
+        await navigator.clipboard.writeText(content);
+        
+        // Show success feedback
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check"></i>';
+        button.classList.add('copied');
+        
+        setTimeout(() => {
+          button.innerHTML = originalHTML;
+          button.classList.remove('copied');
+        }, 2000);
+      } catch (err) {
+        console.error('Clipboard API failed:', err);
+        // Fallback to traditional method
+        fallbackCopyTextToClipboard(content, button);
+      }
+    }
+    
+    function fallbackCopyTextToClipboard(text, button) {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      
+      // Avoid scrolling to bottom
+      textArea.style.top = "0";
+      textArea.style.left = "0";
+      textArea.style.position = "fixed";
+      
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+          const originalHTML = button.innerHTML;
+          button.innerHTML = '<i class="fas fa-check"></i>';
+          button.classList.add('copied');
+          
+          setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.classList.remove('copied');
+          }, 2000);
+        } else {
+          throw new Error('execCommand failed');
+        }
+      } catch (err) {
+        console.error('Fallback copy failed:', err);
+        alert('复制失败，请手动选择文本复制');
+      }
+      
+      document.body.removeChild(textArea);
+    }
+  </script>
+{% endblock %}

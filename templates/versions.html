@@ -1,0 +1,1280 @@
+{% extends 'layout.html' %}
+{% block title %}历史版本 - {{ prompt['name'] }} - Prompt 管理器{% endblock %}
+{% block content %}
+  <div class="versions-page">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-main">
+          <h1 class="page-title">
+            <i class="fas fa-history"></i>
+            历史版本
+          </h1>
+          <div class="breadcrumb">
+            <a href="{{ url_for('index') }}" class="breadcrumb-item">
+              <i class="fas fa-home"></i> 首页
+            </a>
+            <span class="breadcrumb-separator">/</span>
+            <a href="{{ url_for('prompt_detail', prompt_id=prompt['id']) }}" class="breadcrumb-item">
+              {{ prompt['name'] }}
+            </a>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-item active">历史版本</span>
+          </div>
+        </div>
+        <div class="header-actions">
+          <a href="{{ url_for('prompt_detail', prompt_id=prompt['id']) }}" class="btn btn-outline">
+            <i class="fas fa-arrow-left"></i> 返回编辑
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 提示词信息卡片 -->
+    <div class="prompt-info-card">
+      <div class="prompt-info-header">
+        <div class="prompt-title">
+          <i class="fas fa-file-alt"></i>
+          <span>{{ prompt['name'] }}</span>
+        </div>
+        <div class="prompt-meta">
+          {% if prompt['source'] %}
+          <span class="meta-item">
+            <i class="fas fa-link"></i>
+            {{ prompt['source'] }}
+          </span>
+          {% endif %}
+          <span class="meta-item">
+            <i class="fas fa-calendar"></i>
+            创建于 {{ prompt['created_at'][:19].replace('T',' ') }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    {% if versions|length == 0 %}
+      <!-- 空状态 -->
+      <div class="empty-state">
+        <div class="empty-icon">
+          <i class="fas fa-history"></i>
+        </div>
+        <h3 class="empty-title">暂无历史版本</h3>
+        <p class="empty-description">
+          该提示词还没有保存过任何版本历史。<br>
+          开始编辑并保存版本来追踪内容变化。
+        </p>
+        <div class="empty-actions">
+          <a href="{{ url_for('prompt_detail', prompt_id=prompt['id']) }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> 创建第一个版本
+          </a>
+          <a href="{{ url_for('index') }}" class="btn btn-outline">
+            <i class="fas fa-home"></i> 返回首页
+          </a>
+        </div>
+      </div>
+    {% else %}
+      <!-- 统计信息 -->
+      <div class="stats-section">
+        <div class="stats-container">
+          <div class="stat-card">
+            <div class="stat-icon">
+              <i class="fas fa-file-alt"></i>
+            </div>
+            <div class="stat-content">
+              <div class="stat-value">{{ versions|length }}</div>
+              <div class="stat-label">总版本数</div>
+            </div>
+          </div>
+          
+          <div class="stat-card">
+            <div class="stat-icon">
+              <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-content">
+              <div class="stat-value">{{ versions[0]['created_at'][:19].replace('T',' ') }}</div>
+              <div class="stat-label">最近更新</div>
+            </div>
+          </div>
+          
+          {% if current %}
+          <div class="stat-card">
+            <div class="stat-icon">
+              <i class="fas fa-star"></i>
+            </div>
+            <div class="stat-content">
+              <div class="stat-value">{{ current['version'] }}</div>
+              <div class="stat-label">当前版本</div>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+        
+        <div class="actions-bar">
+          <button class="btn btn-primary" onclick="showDiffSelector()">
+            <i class="fas fa-code-compare"></i> 选择版本对比
+          </button>
+        </div>
+      </div>
+
+      <!-- 版本列表 -->
+      <div class="versions-section">
+        <div class="section-header">
+          <h2 class="section-title">
+            <i class="fas fa-list"></i>
+            版本历史
+          </h2>
+          <div class="section-subtitle">
+            按时间倒序排列，最新的版本显示在最前面
+          </div>
+        </div>
+
+        <div class="version-list">
+          {% for v in versions %}
+            <div class="version-item {% if current and v['id']==current['id'] %}current{% endif %}" data-version-id="{{ v['id'] }}">
+              <div class="version-card">
+                <!-- 版本头部 -->
+                <div class="version-header">
+                  <div class="version-identifier">
+                    <div class="version-badge">
+                      <i class="fas fa-code-branch"></i>
+                      <span class="version-number">{{ v['version'] }}</span>
+                    </div>
+                    {% if current and v['id']==current['id'] %}
+                      <div class="current-badge">
+                        <i class="fas fa-star"></i>
+                        <span>当前版本</span>
+                      </div>
+                    {% endif %}
+                  </div>
+                  <div class="version-timestamp">
+                    <i class="fas fa-clock"></i>
+                    <span>{{ v['created_at'][:19].replace('T',' ') }}</span>
+                  </div>
+                </div>
+
+                <!-- 版本内容预览 -->
+                <div class="version-preview">
+                  <div class="preview-header">
+                    <i class="fas fa-file-text"></i>
+                    <span>内容预览</span>
+                    <button class="btn btn-outline btn-sm copy-btn" onclick="copyPreviewContent(this)" data-content="{{ v['content']|e }}" title="复制内容">
+                      <i class="fas fa-copy"></i>
+                    </button>
+                  </div>
+                  <div class="preview-content">
+                    {{ (v['content'][:80] + '...') if v['content']|length > 80 else v['content'] }}
+                  </div>
+                </div>
+
+                <!-- 版本操作 -->
+                <div class="version-actions">
+                  <div class="action-group primary-actions">
+                    <button class="btn btn-outline btn-sm" onclick="viewVersion({{ v['id'] }})" title="查看完整版本内容">
+                      <i class="fas fa-eye"></i>
+                      <span>查看详情</span>
+                    </button>
+                    
+                    {% if current and v['id'] != current['id'] %}
+                    <button class="btn btn-outline btn-sm" onclick="compareWithCurrent({{ v['id'] }})" title="与当前版本对比">
+                      <i class="fas fa-code-compare"></i>
+                      <span>对比差异</span>
+                    </button>
+                    {% endif %}
+                  </div>
+                  
+                  <div class="action-group secondary-actions">
+                    {% if current and v['id'] != current['id'] %}
+                    <button class="btn btn-primary btn-sm" onclick="rollbackToVersion({{ v['id'] }})" title="基于此版本内容创建新版本">
+                      <i class="fas fa-undo"></i>
+                      <span>恢复到此版本</span>
+                    </button>
+                    {% endif %}
+                    
+                    {% if current and v['id'] == current['id'] %}
+                    <button class="btn btn-success btn-sm" disabled title="当前使用中">
+                      <i class="fas fa-check"></i>
+                      <span>当前使用中</span>
+                    </button>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Version Content Modal -->
+  <div id="versionModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="fas fa-file-alt"></i> 版本内容</h3>
+        <button class="modal-close" onclick="closeVersionModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="version-detail">
+          <div class="version-header-info">
+            <div class="version-title" id="modalVersionTitle"></div>
+            <div class="version-time" id="modalVersionTime"></div>
+          </div>
+          <div class="version-content-wrapper">
+            <div class="version-content-text" id="modalVersionContent"></div>
+            <button class="btn btn-primary btn-sm copy-modal-btn" onclick="copyModalContent()" title="复制内容">
+              <i class="fas fa-copy"></i>
+              <span>复制</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diff Selector Modal -->
+  <div id="diffModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="fas fa-code-compare"></i> 选择对比版本</h3>
+        <button class="modal-close" onclick="closeDiffModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="diff-selector">
+          <div class="diff-options">
+            <div class="diff-option">
+              <label>左侧版本：</label>
+              <select id="leftVersion" class="version-select">
+                {% for v in versions %}
+                <option value="{{ v['id'] }}">{{ v['version'] }} - {{ v['created_at'][:19].replace('T',' ') }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="diff-option">
+              <label>右侧版本：</label>
+              <select id="rightVersion" class="version-select">
+                {% for v in versions %}
+                <option value="{{ v['id'] }}" {% if loop.first %}selected{% endif %}>{{ v['version'] }} - {{ v['created_at'][:19].replace('T',' ') }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="diff-actions-modal">
+            <button class="btn btn-primary" onclick="performDiff()">
+              <i class="fas fa-code-compare"></i> 开始对比
+            </button>
+            <button class="btn btn-outline" onclick="closeDiffModal()">
+              <i class="fas fa-times"></i> 取消
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    /* 页面整体布局 */
+    .versions-page {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: var(--spacing-xl);
+    }
+
+    /* 页面头部 */
+    .page-header {
+      background: linear-gradient(135deg, var(--primary) 0%, color-mix(in srgb, var(--primary) 80%, var(--card)) 100%);
+      color: var(--text-on-primary);
+      padding: var(--spacing-3xl) var(--spacing-xl);
+      margin: calc(-1 * var(--spacing-xl)) calc(-1 * var(--spacing-xl)) var(--spacing-2xl);
+      border-radius: 0 0 var(--radius-2xl) var(--radius-2xl);
+    }
+
+    .header-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--spacing-lg);
+    }
+
+    .header-main h1 {
+      font-size: var(--font-size-3xl);
+      font-weight: 700;
+      margin: 0 0 var(--spacing-sm) 0;
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+    }
+
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      font-size: var(--font-size-sm);
+      opacity: 0.9;
+    }
+
+    .breadcrumb-item {
+      color: var(--text-on-primary);
+      text-decoration: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .breadcrumb-item:hover {
+      opacity: 1;
+      text-decoration: underline;
+    }
+
+    .breadcrumb-item.active {
+      opacity: 1;
+      font-weight: 600;
+    }
+
+    .breadcrumb-separator {
+      opacity: 0.7;
+    }
+
+    /* 提示词信息卡片 */
+    .prompt-info-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: var(--spacing-xl);
+      margin-bottom: var(--spacing-2xl);
+      box-shadow: 0 2px 8px var(--shadow);
+    }
+
+    .prompt-info-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: var(--spacing-lg);
+    }
+
+    .prompt-title {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      font-size: var(--font-size-xl);
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    .prompt-meta {
+      display: flex;
+      gap: var(--spacing-lg);
+      flex-wrap: wrap;
+    }
+
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+      font-size: var(--font-size-sm);
+      color: var(--muted);
+    }
+
+    /* 统计信息区域 */
+    .stats-section {
+      margin-bottom: var(--spacing-2xl);
+    }
+
+    .stats-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: var(--spacing-lg);
+      margin-bottom: var(--spacing-xl);
+    }
+
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: var(--spacing-lg);
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-lg);
+      transition: all 0.3s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px var(--shadow);
+      border-color: color-mix(in srgb, var(--primary) 20%, var(--border));
+    }
+
+    .stat-icon {
+      width: 48px;
+      height: 48px;
+      background: color-mix(in srgb, var(--primary) 10%, transparent);
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--font-size-xl);
+      color: var(--primary);
+    }
+
+    .stat-content {
+      flex: 1;
+    }
+
+    .stat-value {
+      font-size: var(--font-size-lg);
+      font-weight: 700;
+      color: var(--primary);
+      line-height: 1.2;
+    }
+
+    .stat-label {
+      font-size: var(--font-size-sm);
+      color: var(--muted);
+      margin-top: var(--spacing-xs);
+    }
+
+    .actions-bar {
+      display: flex;
+      justify-content: center;
+      padding: var(--spacing-lg);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+    }
+
+    /* 版本列表区域 */
+    .versions-section {
+      margin-bottom: var(--spacing-2xl);
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: var(--spacing-2xl);
+    }
+
+    .section-title {
+      font-size: var(--font-size-2xl);
+      font-weight: 700;
+      color: var(--primary);
+      margin: 0 0 var(--spacing-sm) 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--spacing-sm);
+    }
+
+    .section-subtitle {
+      font-size: var(--font-size-base);
+      color: var(--muted);
+    }
+
+    .version-list {
+      display: grid;
+      gap: var(--spacing-lg);
+    }
+
+    .version-item {
+      opacity: 0;
+      animation: fadeInUp 0.5s ease-out forwards;
+    }
+
+    .version-item:nth-child(1) { animation-delay: 0.1s; }
+    .version-item:nth-child(2) { animation-delay: 0.2s; }
+    .version-item:nth-child(3) { animation-delay: 0.3s; }
+    .version-item:nth-child(4) { animation-delay: 0.4s; }
+    .version-item:nth-child(5) { animation-delay: 0.5s; }
+
+    .version-card {
+      background: var(--card);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .version-card:hover {
+      border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+      box-shadow: 0 8px 32px var(--shadow-hover);
+      transform: translateY(-2px);
+    }
+
+    .version-item.current .version-card {
+      border-color: var(--primary);
+      background: color-mix(in srgb, var(--primary) 3%, var(--card));
+      box-shadow: 0 8px 32px color-mix(in srgb, var(--primary) 20%, transparent);
+    }
+
+    .version-item.current .version-card::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: var(--primary);
+    }
+
+    /* 版本头部 */
+    .version-header {
+      padding: var(--spacing-lg);
+      border-bottom: 1px solid var(--border);
+      background: color-mix(in srgb, var(--bg) 50%, transparent);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: var(--spacing-lg);
+    }
+
+    .version-identifier {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-md);
+      flex-wrap: wrap;
+    }
+
+    .version-badge {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+      background: color-mix(in srgb, var(--primary) 10%, transparent);
+      color: var(--primary);
+      padding: var(--spacing-sm) var(--spacing-md);
+      border-radius: var(--radius-lg);
+      font-weight: 600;
+      font-size: var(--font-size-sm);
+      border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+    }
+
+    .current-badge {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+      background: var(--primary);
+      color: var(--text-on-primary);
+      padding: var(--spacing-xs) var(--spacing-md);
+      border-radius: 20px;
+      font-size: var(--font-size-xs);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .version-timestamp {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+      font-size: var(--font-size-sm);
+      color: var(--muted);
+    }
+
+    /* 版本预览 */
+    .version-preview {
+      padding: var(--spacing-md);
+    }
+
+    .preview-header {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: var(--spacing-sm);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      justify-content: space-between;
+    }
+
+    .preview-content {
+      font-family: 'Consolas', 'Monaco', 'SF Mono', monospace;
+      font-size: var(--font-size-xs);
+      line-height: 1.4;
+      color: var(--fg);
+      background: var(--bg);
+      padding: var(--spacing-sm);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      white-space: pre-wrap;
+      word-break: break-word;
+      text-align: left;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+
+    /* 版本操作 */
+    .version-actions {
+      padding: var(--spacing-lg);
+      background: color-mix(in srgb, var(--bg) 30%, var(--card));
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--spacing-md);
+      flex-wrap: wrap;
+    }
+
+    .action-group {
+      display: flex;
+      gap: var(--spacing-sm);
+      align-items: center;
+    }
+
+    .primary-actions {
+      flex: 1;
+    }
+
+    .secondary-actions {
+      flex-shrink: 0;
+    }
+
+    /* 按钮样式 */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+      padding: var(--spacing-sm) var(--spacing-md);
+      border-radius: var(--radius-lg);
+      text-decoration: none;
+      font-weight: 500;
+      font-size: var(--font-size-sm);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .btn-sm {
+      padding: var(--spacing-xs) var(--spacing-sm);
+      font-size: var(--font-size-xs);
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: var(--text-on-primary);
+      border-color: var(--primary);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--primary) 90%, var(--card));
+      border-color: color-mix(in srgb, var(--primary) 90%, var(--card));
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--primary);
+      border-color: var(--primary);
+    }
+
+    .btn-outline:hover:not(:disabled) {
+      background: var(--primary);
+      color: var(--text-on-primary);
+    }
+
+    .btn-success {
+      background: var(--ins);
+      color: var(--text-on-primary);
+      border-color: var(--ins);
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* 空状态 */
+    .empty-state {
+      text-align: center;
+      padding: var(--spacing-4xl);
+      border: 2px dashed var(--border);
+      border-radius: var(--radius-2xl);
+      background: color-mix(in srgb, var(--card) 50%, transparent);
+    }
+
+    .empty-icon {
+      font-size: 4rem;
+      color: var(--muted);
+      opacity: 0.5;
+      margin-bottom: var(--spacing-xl);
+    }
+
+    .empty-title {
+      font-size: var(--font-size-xl);
+      font-weight: 600;
+      color: var(--fg);
+      margin: 0 0 var(--spacing-md) 0;
+    }
+
+    .empty-description {
+      font-size: var(--font-size-base);
+      color: var(--muted);
+      margin: 0 0 var(--spacing-2xl) 0;
+      line-height: 1.6;
+    }
+
+    .empty-actions {
+      display: flex;
+      gap: var(--spacing-md);
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    /* 动画 */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* 响应式设计 */
+    @media (max-width: 768px) {
+      .versions-page {
+        padding: var(--spacing-lg);
+      }
+
+      .page-header {
+        margin: calc(-1 * var(--spacing-lg)) calc(-1 * var(--spacing-lg)) var(--spacing-xl);
+        padding: var(--spacing-2xl) var(--spacing-lg);
+      }
+
+      .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-md);
+      }
+
+      .header-main h1 {
+        font-size: var(--font-size-2xl);
+      }
+
+      .stats-container {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+      }
+
+      .version-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--spacing-sm);
+      }
+
+      .action-group {
+        justify-content: center;
+      }
+
+      .version-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-sm);
+      }
+
+      .version-identifier {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-sm);
+      }
+
+      .empty-actions {
+        flex-direction: column;
+        align-items: center;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .versions-page {
+        padding: var(--spacing-md);
+      }
+
+      .page-header {
+        padding: var(--spacing-xl) var(--spacing-md);
+      }
+
+      .header-main h1 {
+        font-size: var(--font-size-xl);
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-xs);
+      }
+
+      .breadcrumb {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-xs);
+      }
+
+      .version-actions {
+        padding: var(--spacing-md);
+      }
+
+      .btn {
+        font-size: var(--font-size-xs);
+        padding: var(--spacing-xs) var(--spacing-sm);
+      }
+    }
+
+    /* Modal Styles */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
+    }
+    
+    .modal-content {
+      position: relative;
+      background: var(--card);
+      margin: 5% auto;
+      padding: 0;
+      border-radius: var(--radius-xl);
+      width: 90%;
+      max-width: 700px;
+      max-height: 80vh;
+      overflow: hidden;
+      box-shadow: 0 20px 60px var(--shadow);
+      animation: modalSlideIn 0.3s ease-out;
+    }
+    
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--spacing-lg) var(--spacing-xl);
+      background: color-mix(in srgb, var(--primary) 5%, var(--card));
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .modal-header h3 {
+      margin: 0;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+    }
+    
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: var(--muted);
+      padding: var(--spacing-xs);
+      border-radius: var(--radius-md);
+      transition: all 0.2s ease;
+    }
+    
+    .modal-close:hover {
+      background: var(--del);
+      color: var(--text-on-primary);
+    }
+    
+    .modal-body {
+      padding: var(--spacing-xl);
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+    
+    .version-detail .version-header-info {
+      margin-bottom: var(--spacing-lg);
+      padding-bottom: var(--spacing-lg);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .version-title {
+      font-size: var(--font-size-xl);
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: var(--spacing-sm);
+    }
+    
+    .version-time {
+      color: var(--muted);
+      font-size: var(--font-size-sm);
+    }
+    
+    .version-content-text {
+      background: var(--bg);
+      padding: var(--spacing-lg);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      white-space: pre-wrap;
+      font-family: 'Consolas', 'Monaco', 'SF Mono', monospace;
+      line-height: 1.6;
+      font-size: var(--font-size-sm);
+      text-align: left;
+    }
+    
+    .version-content-wrapper {
+      position: relative;
+    }
+    
+    .copy-modal-btn {
+      position: absolute;
+      top: var(--spacing-md);
+      right: var(--spacing-md);
+      z-index: 10;
+    }
+    
+    .copy-btn {
+      padding: var(--spacing-xs) var(--spacing-sm);
+      font-size: var(--font-size-xs);
+      min-width: auto;
+      height: auto;
+      line-height: 1;
+    }
+    
+    .diff-selector .diff-options {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-lg);
+      margin-bottom: var(--spacing-xl);
+    }
+    
+    .diff-option {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-md);
+    }
+    
+    .diff-option label {
+      font-weight: 500;
+      color: var(--fg);
+      min-width: 80px;
+    }
+    
+    .version-select {
+      flex: 1;
+      padding: var(--spacing-sm) var(--spacing-md);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: var(--bg);
+      color: var(--fg);
+      font-size: var(--font-size-sm);
+      cursor: pointer;
+    }
+    
+    .diff-actions-modal {
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--spacing-md);
+    }
+    
+    @keyframes modalSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-50px) scale(0.9);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+    
+    /* Modal Responsive Design */
+    @media (max-width: 768px) {
+      .modal-content {
+        margin: 10% auto;
+        width: 95%;
+      }
+      
+      .copy-modal-btn {
+        top: var(--spacing-sm);
+        right: var(--spacing-sm);
+        padding: var(--spacing-xs) var(--spacing-sm);
+        font-size: var(--font-size-xs);
+      }
+      
+      .copy-btn {
+        padding: 4px 8px;
+        font-size: 10px;
+      }
+      
+      .preview-header {
+        flex-wrap: wrap;
+        gap: var(--spacing-xs);
+      }
+      
+      .diff-option {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--spacing-sm);
+      }
+      
+      .diff-option label {
+        min-width: auto;
+      }
+    }
+  </style>
+
+  <script>
+    const versionsData = {{ versions|tojson }};
+    const currentVersionId = {{ current['id'] if current else 'null' }};
+    const promptId = {{ prompt['id'] }};
+
+    function viewVersion(versionId) {
+      const version = versionsData.find(v => v.id === versionId);
+      if (version) {
+        document.getElementById('modalVersionTitle').textContent = `版本 ${version.version}`;
+        document.getElementById('modalVersionTime').textContent = version.created_at.replace('T', ' ').substring(0, 19);
+        document.getElementById('modalVersionContent').textContent = version.content || '无内容';
+        document.getElementById('versionModal').style.display = 'block';
+      } else {
+        alert('版本信息不存在，请刷新页面重试');
+      }
+    }
+
+    function closeVersionModal() {
+      document.getElementById('versionModal').style.display = 'none';
+    }
+
+    async function copyPreviewContent(button) {
+      const content = button.getAttribute('data-content');
+      
+      // Check if clipboard API is available
+      if (!navigator.clipboard) {
+        fallbackCopyTextToClipboard(content, button);
+        return;
+      }
+      
+      try {
+        await navigator.clipboard.writeText(content);
+        
+        // Show success feedback
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check"></i>';
+        button.style.background = 'var(--ins)';
+        button.style.borderColor = 'var(--ins)';
+        
+        setTimeout(() => {
+          button.innerHTML = originalHTML;
+          button.style.background = '';
+          button.style.borderColor = '';
+        }, 2000);
+      } catch (err) {
+        console.error('Clipboard API failed:', err);
+        // Fallback to traditional method
+        fallbackCopyTextToClipboard(content, button);
+      }
+    }
+
+    async function copyModalContent() {
+      const content = document.getElementById('modalVersionContent').textContent;
+      if (!content || content === '无内容') {
+        return;
+      }
+      
+      // Check if clipboard API is available
+      if (!navigator.clipboard) {
+        fallbackCopyTextToClipboard(content, null, true);
+        return;
+      }
+      
+      try {
+        await navigator.clipboard.writeText(content);
+        
+        // Show success feedback
+        const button = document.querySelector('.copy-modal-btn');
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check"></i> <span>已复制</span>';
+        
+        setTimeout(() => {
+          button.innerHTML = originalHTML;
+        }, 2000);
+      } catch (err) {
+        console.error('Clipboard API failed:', err);
+        // Fallback to traditional method
+        fallbackCopyTextToClipboard(content, null, true);
+      }
+    }
+
+    function fallbackCopyTextToClipboard(text, button = null, isModal = false) {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      
+      // Avoid scrolling to bottom
+      textArea.style.top = "0";
+      textArea.style.left = "0";
+      textArea.style.position = "fixed";
+      
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+          if (button) {
+            // Preview button feedback
+            const originalHTML = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-check"></i>';
+            button.style.background = 'var(--ins)';
+            button.style.borderColor = 'var(--ins)';
+            
+            setTimeout(() => {
+              button.innerHTML = originalHTML;
+              button.style.background = '';
+              button.style.borderColor = '';
+            }, 2000);
+          } else if (isModal) {
+            // Modal button feedback
+            const modalBtn = document.querySelector('.copy-modal-btn');
+            const originalHTML = modalBtn.innerHTML;
+            modalBtn.innerHTML = '<i class="fas fa-check"></i> <span>已复制</span>';
+            
+            setTimeout(() => {
+              modalBtn.innerHTML = originalHTML;
+            }, 2000);
+          }
+        } else {
+          throw new Error('execCommand failed');
+        }
+      } catch (err) {
+        console.error('Fallback copy failed:', err);
+        alert('复制失败，请手动选择文本复制');
+      }
+      
+      document.body.removeChild(textArea);
+    }
+
+    function showDiffSelector() {
+      const leftSelect = document.getElementById('leftVersion');
+      const rightSelect = document.getElementById('rightVersion');
+      
+      if (!leftSelect || !rightSelect) {
+        alert('页面加载错误，请刷新页面重试');
+        return;
+      }
+      
+      document.getElementById('diffModal').style.display = 'block';
+      
+      // Set smart defaults
+      if (currentVersionId) {
+        // Set right to current version, left to previous version
+        rightSelect.value = currentVersionId;
+        const currentIndex = versionsData.findIndex(v => v.id === currentVersionId);
+        if (currentIndex < versionsData.length - 1) {
+          leftSelect.value = versionsData[currentIndex + 1].id;
+        }
+      }
+    }
+
+    function closeDiffModal() {
+      document.getElementById('diffModal').style.display = 'none';
+    }
+
+    function compareWithCurrent(versionId) {
+      if (currentVersionId && versionId !== currentVersionId) {
+        window.location.href = `/prompt/{{ prompt['id'] }}/diff?left=${versionId}&right=${currentVersionId}`;
+      }
+    }
+
+    function performDiff() {
+      const leftSelect = document.getElementById('leftVersion');
+      const rightSelect = document.getElementById('rightVersion');
+      
+      if (!leftSelect || !rightSelect) {
+        alert('页面加载错误，请刷新页面重试');
+        return;
+      }
+      
+      const leftId = leftSelect.value;
+      const rightId = rightSelect.value;
+      
+      if (!leftId || !rightId) {
+        alert('请选择要对比的版本');
+        return;
+      }
+      
+      if (leftId === rightId) {
+        alert('请选择两个不同的版本进行对比');
+        return;
+      }
+      
+      window.location.href = `/prompt/{{ prompt['id'] }}/diff?left=${leftId}&right=${rightId}`;
+    }
+
+    function rollbackToVersion(versionId) {
+      const version = versionsData.find(v => v.id === versionId);
+      if (!version) {
+        alert('版本信息不存在，请刷新页面重试');
+        return;
+      }
+      
+      const message = `确定要回滚到版本 ${version.version} 吗？
+
+📝 回滚说明：
+• 这将基于版本 ${version.version} 的内容创建一个新版本
+• 当前版本 ${currentVersionId ? (versionsData.find(v => v.id === currentVersionId)?.version || '未知') : '未知'} 不会被删除
+• 新版本号将在当前版本基础上递增
+• 所有版本历史都会保留
+
+此操作不可撤销，是否继续？`;
+      
+      if (confirm(message)) {
+        try {
+          // Create form for rollback
+          const form = document.createElement('form');
+          form.method = 'POST';
+          form.action = `/prompt/{{ prompt['id'] }}/rollback/${versionId}`;
+          
+          // Add bump kind selection
+          const bumpKind = document.createElement('input');
+          bumpKind.type = 'hidden';
+          bumpKind.name = 'bump_kind';
+          bumpKind.value = 'patch'; // Default to patch
+          form.appendChild(bumpKind);
+          
+          document.body.appendChild(form);
+          form.submit();
+        } catch (error) {
+          alert('操作失败，请刷新页面重试');
+          console.error('Rollback error:', error);
+        }
+      }
+    }
+
+    // Close modals when clicking outside
+    window.addEventListener('click', (e) => {
+      const versionModal = document.getElementById('versionModal');
+      const diffModal = document.getElementById('diffModal');
+      
+      if (e.target === versionModal) {
+        closeVersionModal();
+      }
+      if (e.target === diffModal) {
+        closeDiffModal();
+      }
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeVersionModal();
+        closeDiffModal();
+      }
+    });
+
+    // Initialize tooltips and interactions
+    document.addEventListener('DOMContentLoaded', () => {
+      // Add hover effects and animations
+      const versionItems = document.querySelectorAll('.version-item');
+      versionItems.forEach(item => {
+        item.addEventListener('mouseenter', () => {
+          item.style.transform = 'translateY(-2px)';
+        });
+        
+        item.addEventListener('mouseleave', () => {
+          item.style.transform = '';
+        });
+      });
+    });
+  </script>
+{% endblock %}

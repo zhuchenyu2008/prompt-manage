@@ -1,0 +1,1137 @@
+{% extends 'layout.html' %}
+{% block title %}详情 - Prompt 管理器{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <h1 class="page-title">
+      <i class="fas fa-edit"></i>
+      {% if prompt %}
+        {{ prompt['name'] }}
+      {% else %}
+        提示词编辑
+      {% endif %}
+    </h1>
+    <p class="page-subtitle">
+      {% if prompt %}
+        编辑 "{{ prompt['name'] }}" 的内容和属性
+      {% else %}
+        创建新的提示词
+      {% endif %}
+    </p>
+  </div>
+
+  <div class="prompt-editor-container">
+    <div class="breadcrumb-nav">
+      <a class="btn ghost" href="{{ url_for('index') }}">
+        <i class="fas fa-arrow-left"></i> 返回列表
+      </a>
+      {% if prompt %}
+        <a class="btn" href="{{ url_for('versions_page', prompt_id=prompt['id']) }}">
+          <i class="fas fa-history"></i> 历史版本
+        </a>
+      {% endif %}
+    </div>
+
+    <form method="post" class="prompt-form">
+      <div class="form-sections">
+        <!-- Basic Information Section -->
+        <div class="form-section primary-section">
+          <div class="section-header">
+            <i class="fas fa-info-circle"></i>
+            <h3>基本信息</h3>
+          </div>
+          <div class="section-content">
+            <div class="form-group">
+              <label for="name">
+                <i class="fas fa-heading"></i>
+                提示词名称
+                <span class="required">*</span>
+              </label>
+              <input type="text" id="name" name="name" value="{{ (prompt and prompt['name']) or '' }}" 
+                     placeholder="输入提示词的名称" required />
+              </div>
+
+            <div class="form-group">
+              <label for="content">
+                <i class="fas fa-file-alt"></i>
+                提示词内容
+                <span class="required">*</span>
+              </label>
+              <div class="textarea-wrapper">
+                <textarea id="content" name="content" rows="16" 
+                          placeholder="在此输入提示词的完整内容...">{{ (current and current['content']) or '' }}</textarea>
+                <div class="textarea-footer">
+                  <div class="char-counter">0 字符</div>
+                  <div class="textarea-actions">
+                    <button type="button" class="icon-btn" id="copyBtn" title="复制内容">
+                      <i class="fas fa-copy"></i>
+                    </button>
+                    <button type="button" class="icon-btn" id="resizeBtn" title="自动调整大小">
+                      <i class="fas fa-expand-alt"></i>
+                    </button>
+                    <button type="button" class="icon-btn" id="clearBtn" title="清空内容">
+                      <i class="fas fa-eraser"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Version Control Section -->
+        <div class="form-section">
+          <div class="section-header collapsible" onclick="toggleSection(this)">
+            <i class="fas fa-cog"></i>
+            <h3>高级设置</h3>
+            <i class="fas fa-chevron-down section-toggle"></i>
+          </div>
+          <div class="section-content">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="source">
+                  <i class="fas fa-link"></i>
+                  来源
+                </label>
+                <input type="text" id="source" name="source" value="{{ (prompt and prompt['source']) or '' }}" 
+                       placeholder="提示词来源" />
+                </div>
+
+              <div class="form-group">
+                <label for="tags">
+                  <i class="fas fa-tags"></i>
+                  标签
+                </label>
+                <div class="tags-input-wrapper">
+                  <input type="text" id="tags" name="tags" 
+                         value="{% if prompt and prompt['tags'] %}{{ (prompt['tags']|loads)|join(', ') }}{% endif %}" 
+                         placeholder="标签，用逗号分隔" />
+                  </div>
+              </div>
+
+              <div class="form-group">
+                <label for="notes">
+                  <i class="fas fa-sticky-note"></i>
+                  备注
+                </label>
+                <input type="text" id="notes" name="notes" value="{{ (prompt and prompt['notes']) or '' }}" 
+                       placeholder="补充说明或使用注意事项" />
+                  </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Form Actions -->
+      <div class="form-actions">
+        <div class="actions-main">
+          <button type="submit" class="btn primary">
+            <i class="fas fa-check"></i>
+            {% if prompt %}
+              保存修改
+            {% else %}
+              创建提示词
+            {% endif %}
+          </button>
+          
+          <a href="{{ url_for('index') }}" class="btn ghost">
+            <i class="fas fa-arrow-left"></i>
+            返回列表
+          </a>
+        </div>
+        
+        <div class="actions-version">
+          <div class="version-checkbox">
+            <label class="checkbox-label">
+              <input type="checkbox" name="do_save_version" value="1" checked />
+              <span class="checkbox-custom"></span>
+              <span class="checkbox-text">
+                <i class="fas fa-save"></i>
+                保存为新版本
+              </span>
+            </label>
+          </div>
+          
+          <div class="version-select-wrapper">
+            <select id="bump_kind" name="bump_kind" class="version-select">
+              <option value="patch" selected>
+                补丁版本 (+0.0.1)
+              </option>
+              <option value="minor">
+                次版本 (+0.1.0)
+              </option>
+              <option value="major">
+                主版本 (+1.0.0)
+              </option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Preview Modal -->
+  <div id="previewModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="fas fa-eye"></i> 提示词预览</h3>
+        <button class="modal-close" onclick="closePreview()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="preview-content">
+          <h4 id="previewName"></h4>
+          <div id="previewText"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .page-header {
+      text-align: center;
+      margin-bottom: var(--spacing-3xl);
+    }
+    
+    .page-title {
+      font-size: var(--font-size-3xl);
+      font-weight: 700;
+      color: var(--primary);
+      margin: 0 0 var(--spacing-sm) 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--spacing-sm);
+    }
+    
+    .page-subtitle {
+      font-size: var(--font-size-lg);
+      color: var(--muted);
+      margin: 0;
+    }
+    
+    .prompt-editor-container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    
+    .breadcrumb-nav {
+      display: flex;
+      gap: var(--spacing-md);
+      margin-bottom: var(--spacing-2xl);
+      flex-wrap: wrap;
+    }
+    
+    .form-sections {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-xl);
+    }
+    
+    .form-section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+    
+    .form-section:hover {
+      border-color: color-mix(in srgb, var(--primary) 20%, var(--border));
+      box-shadow: 0 4px 16px var(--shadow);
+    }
+    
+    .primary-section {
+      border-color: var(--primary);
+      background: color-mix(in srgb, var(--primary) 3%, var(--card));
+    }
+    
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-md);
+      padding: var(--spacing-lg) var(--spacing-xl);
+      background: color-mix(in srgb, var(--card) 50%, transparent);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .primary-section .section-header {
+      background: color-mix(in srgb, var(--primary) 8%, var(--card));
+      border-bottom-color: color-mix(in srgb, var(--primary) 20%, var(--border));
+    }
+    
+    .section-header i {
+      font-size: var(--font-size-lg);
+      color: var(--primary);
+    }
+    
+    .section-header h3 {
+      font-size: var(--font-size-lg);
+      font-weight: 600;
+      color: var(--fg);
+      margin: 0;
+      flex: 1;
+    }
+    
+    .collapsible {
+      cursor: pointer;
+      user-select: none;
+    }
+    
+    .collapsible:hover {
+      background: color-mix(in srgb, var(--primary) 5%, var(--card));
+    }
+    
+    .section-toggle {
+      transition: transform 0.3s ease;
+      font-size: var(--font-size-sm);
+      color: var(--muted);
+    }
+    
+    .collapsible.active .section-toggle {
+      transform: rotate(180deg);
+    }
+    
+    .section-content {
+      padding: var(--spacing-xl);
+    }
+    
+    .form-group {
+      margin-bottom: var(--spacing-xl);
+    }
+    
+    .form-group:last-child {
+      margin-bottom: 0;
+    }
+    
+    .form-group label {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      font-weight: 600;
+      color: var(--fg);
+      font-size: var(--font-size-base);
+      margin-bottom: var(--spacing-sm);
+    }
+    
+    .form-group label i {
+      color: var(--primary);
+      font-size: var(--font-size-lg);
+    }
+    
+    .required {
+      color: var(--del);
+      font-weight: 700;
+      margin-left: var(--spacing-xs);
+    }
+    
+    .input-help {
+      font-size: var(--font-size-sm);
+      color: var(--muted);
+      margin-top: var(--spacing-xs);
+      line-height: 1.4;
+    }
+    
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: var(--spacing-lg);
+    }
+    
+    input[type="text"], select, textarea {
+      width: 100%;
+      padding: var(--spacing-md);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: var(--bg);
+      color: var(--fg);
+      font-family: inherit;
+      font-size: var(--font-size-base);
+      transition: all 0.3s ease;
+    }
+    
+    input[type="text"]:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
+      transform: translateY(-1px);
+    }
+    
+    textarea {
+      resize: vertical;
+      min-height: 200px;
+      line-height: 1.6;
+      font-family: 'Consolas', 'Monaco', 'SF Mono', monospace;
+    }
+    
+    .textarea-wrapper {
+      position: relative;
+    }
+    
+    .textarea-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: var(--spacing-sm);
+      padding: var(--spacing-sm);
+      background: var(--card);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+    }
+    
+    .char-counter {
+      font-size: var(--font-size-sm);
+      color: var(--muted);
+      font-weight: 500;
+    }
+    
+    .textarea-actions {
+      display: flex;
+      gap: var(--spacing-xs);
+    }
+    
+    .tags-input-wrapper {
+      position: relative;
+    }
+    
+    .tags-help {
+      font-size: var(--font-size-sm);
+      color: var(--muted);
+      margin-top: var(--spacing-xs);
+    }
+    
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      cursor: pointer;
+      font-weight: 500;
+      color: var(--fg);
+    }
+    
+    .checkbox-custom {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--bg);
+      position: relative;
+      transition: all 0.3s ease;
+    }
+    
+    .checkbox-label input[type="checkbox"]:checked + .checkbox-custom {
+      background: var(--primary);
+      border-color: var(--primary);
+    }
+    
+    .checkbox-label input[type="checkbox"]:checked + .checkbox-custom::after {
+      content: '✓';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: var(--text-on-primary);
+      font-size: 12px;
+      font-weight: bold;
+    }
+    
+    .checkbox-text {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+    }
+    
+    .version-controls {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-lg);
+    }
+    
+    .version-select {
+      cursor: pointer;
+    }
+    
+    .form-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--spacing-lg);
+      margin-top: var(--spacing-2xl);
+      padding: var(--spacing-xl);
+      background: var(--card);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    
+    .actions-main {
+      display: flex;
+      gap: var(--spacing-md);
+      align-items: center;
+    }
+    
+    .actions-version {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-lg);
+      padding: var(--spacing-md);
+      background: color-mix(in srgb, var(--primary) 3%, var(--bg));
+      border-radius: var(--radius-lg);
+      border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--border));
+    }
+    
+    .version-checkbox {
+      flex-shrink: 0;
+    }
+    
+    .version-select-wrapper {
+      flex: 1;
+      max-width: 200px;
+    }
+    
+    .version-select {
+      width: 100%;
+      font-size: var(--font-size-sm);
+      padding: var(--spacing-sm) var(--spacing-md);
+      border-radius: var(--radius-lg);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--fg);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .version-select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
+    }
+    
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      cursor: pointer;
+      font-weight: 500;
+      color: var(--fg);
+    }
+    
+    .checkbox-custom {
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--bg);
+      position: relative;
+      transition: all 0.3s ease;
+      flex-shrink: 0;
+    }
+    
+    .checkbox-label input[type="checkbox"] {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .checkbox-label input[type="checkbox"]:checked + .checkbox-custom {
+      background: var(--primary);
+      border-color: var(--primary);
+    }
+    
+    .checkbox-label input[type="checkbox"]:checked + .checkbox-custom::after {
+      content: '✓';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: var(--text-on-primary);
+      font-size: 12px;
+      font-weight: bold;
+    }
+    
+    .checkbox-text {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+      font-size: var(--font-size-sm);
+    }
+    
+    /* Modal Styles */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
+    }
+    
+    .modal-content {
+      position: relative;
+      background: var(--card);
+      margin: 5% auto;
+      padding: 0;
+      border-radius: var(--radius-xl);
+      width: 90%;
+      max-width: 700px;
+      max-height: 80vh;
+      overflow: hidden;
+      box-shadow: 0 20px 60px var(--shadow);
+      animation: modalSlideIn 0.3s ease-out;
+    }
+    
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--spacing-lg) var(--spacing-xl);
+      background: color-mix(in srgb, var(--primary) 5%, var(--card));
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .modal-header h3 {
+      margin: 0;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+    }
+    
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: var(--muted);
+      padding: var(--spacing-xs);
+      border-radius: var(--radius-md);
+      transition: all 0.2s ease;
+    }
+    
+    .modal-close:hover {
+      background: var(--del);
+      color: var(--text-on-primary);
+    }
+    
+    .modal-body {
+      padding: var(--spacing-xl);
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+    
+    .preview-content h4 {
+      color: var(--primary);
+      margin: 0 0 var(--spacing-lg) 0;
+      font-size: var(--font-size-xl);
+    }
+    
+    .preview-content #previewText {
+      background: var(--bg);
+      padding: var(--spacing-lg);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      white-space: pre-wrap;
+      font-family: 'Consolas', 'Monaco', 'SF Mono', monospace;
+      line-height: 1.6;
+      font-size: var(--font-size-sm);
+    }
+    
+    @keyframes modalSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-50px) scale(0.9);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+    
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      .page-header {
+        margin-bottom: var(--spacing-2xl);
+      }
+      
+      .page-title {
+        font-size: var(--font-size-2xl);
+        flex-direction: column;
+        gap: var(--spacing-xs);
+      }
+      
+      .breadcrumb-nav {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+      }
+      
+      .breadcrumb-nav .btn {
+        width: 100%;
+        justify-content: center;
+      }
+      
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+      
+    .form-actions {
+      flex-direction: column;
+      gap: var(--spacing-lg);
+    }
+    
+    .actions-main {
+      justify-content: center;
+      width: 100%;
+    }
+    
+    .actions-version {
+      justify-content: center;
+      width: 100%;
+      flex-direction: column;
+      gap: var(--spacing-md);
+    }
+    
+    .version-select-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      max-width: 250px;
+    }
+      
+      .section-content {
+        padding: var(--spacing-lg);
+      }
+      
+      .modal-content {
+        margin: 10% auto;
+        width: 95%;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .page-title {
+        font-size: var(--font-size-xl);
+      }
+      
+      .form-section {
+        border-radius: var(--radius-lg);
+      }
+      
+      .section-header {
+        padding: var(--spacing-md) var(--spacing-lg);
+      }
+      
+      .section-header h3 {
+        font-size: var(--font-size-base);
+      }
+      
+      .modal-body {
+        padding: var(--spacing-lg);
+      }
+    }
+  </style>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Initialize form interactions
+      initializeForm();
+      
+      // Auto-resize textarea
+      const textarea = document.getElementById('content');
+      if (textarea) {
+        autoResizeTextarea(textarea);
+        updateCharCounter(textarea);
+        
+        textarea.addEventListener('input', () => {
+          autoResizeTextarea(textarea);
+          updateCharCounter(textarea);
+        });
+      }
+      
+      // Setup tag autocomplete
+      setupTagAutocomplete();
+      
+      // Initialize collapsible sections
+      initializeCollapsibleSections();
+    });
+    
+    function initializeForm() {
+      const form = document.querySelector('.prompt-form');
+      const submitBtn = form.querySelector('button[type="submit"]');
+      
+      // Store original button text
+      submitBtn.dataset.originalText = submitBtn.textContent.trim();
+      
+      // Form submission handler
+      form.addEventListener('submit', (e) => {
+        if (!validateForm()) {
+          e.preventDefault();
+          return;
+        }
+        
+        // Show loading state
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="loading"></span> 保存中...';
+        
+        // Re-enable after 5 seconds (fallback)
+        setTimeout(() => {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = submitBtn.dataset.originalText;
+        }, 5000);
+      });
+    }
+    
+    function autoResizeTextarea(textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = Math.max(200, textarea.scrollHeight) + 'px';
+    }
+    
+    function updateCharCounter(textarea) {
+      const counter = document.querySelector('.char-counter');
+      if (counter) {
+        const length = textarea.value.length;
+        counter.textContent = `${length} 字符`;
+        
+        // Change color based on length
+        if (length > 2000) {
+          counter.style.color = 'var(--del)';
+        } else if (length > 1000) {
+          counter.style.color = 'var(--ins)';
+        } else {
+          counter.style.color = 'var(--muted)';
+        }
+      }
+    }
+    
+    function setupTagAutocomplete() {
+      const tagsInput = document.getElementById('tags');
+      if (!tagsInput) return;
+      
+      let suggestions = [];
+      
+      // Fetch tag suggestions
+      fetch('/api/tags')
+        .then(r => r.json())
+        .then(list => {
+          suggestions = list;
+          createAutocompleteDropdown(tagsInput, suggestions);
+        })
+        .catch(() => {});
+    }
+    
+    function createAutocompleteDropdown(input, suggestions) {
+      const dropdown = document.createElement('div');
+      dropdown.className = 'tag-suggestions';
+      dropdown.style.cssText = `
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 100;
+        display: none;
+        box-shadow: 0 4px 16px var(--shadow);
+      `;
+      
+      input.parentNode.style.position = 'relative';
+      input.parentNode.appendChild(dropdown);
+      
+      // Show/hide dropdown
+      input.addEventListener('focus', () => showSuggestions(input, dropdown, suggestions));
+      input.addEventListener('input', () => showSuggestions(input, dropdown, suggestions));
+      input.addEventListener('blur', () => {
+        setTimeout(() => dropdown.style.display = 'none', 200);
+      });
+    }
+    
+    function showSuggestions(input, dropdown, suggestions) {
+      const val = input.value;
+      const parts = val.replace(/，/g, ',').split(',');
+      const lastPart = parts[parts.length - 1] || '';
+      const lastTag = lastPart.trim();
+      
+      if (lastTag.length >= 1) {
+        const matches = suggestions.filter(tag => 
+          tag.toLowerCase().includes(lastTag.toLowerCase())
+        ).slice(0, 5);
+        
+        if (matches.length > 0) {
+          dropdown.innerHTML = matches.map(tag => 
+            `<div class="tag-suggestion" style="padding: 8px 12px; cursor: pointer; transition: background 0.2s ease;" data-tag="${tag}">
+              ${highlightMatch(tag, lastTag)}
+            </div>`
+          ).join('');
+          
+          dropdown.style.display = 'block';
+          
+          // Add click handlers
+          dropdown.querySelectorAll('.tag-suggestion').forEach(item => {
+            item.addEventListener('click', () => {
+              const tag = item.dataset.tag;
+              parts[parts.length - 1] = tag;
+              input.value = parts.join(', ') + ', ';
+              input.focus();
+              dropdown.style.display = 'none';
+            });
+            
+            item.addEventListener('mouseenter', () => {
+              item.style.background = 'color-mix(in srgb, var(--primary) 10%, transparent)';
+            });
+            
+            item.addEventListener('mouseleave', () => {
+              item.style.background = '';
+            });
+          });
+        } else {
+          dropdown.style.display = 'none';
+        }
+      } else {
+        dropdown.style.display = 'none';
+      }
+    }
+    
+    function highlightMatch(tag, search) {
+      if (!search) return tag;
+      const regex = new RegExp(`(${search})`, 'gi');
+      return tag.replace(regex, '<strong style="color: var(--primary);">$1</strong>');
+    }
+    
+    function initializeCollapsibleSections() {
+      const collapsibles = document.querySelectorAll('.collapsible');
+      collapsibles.forEach(collapsible => {
+        // Start with collapsed state for non-primary sections
+        if (!collapsible.closest('.primary-section')) {
+          collapsible.classList.add('active');
+          const content = collapsible.nextElementSibling;
+          content.style.display = 'block';
+        }
+      });
+    }
+    
+    function toggleSection(header) {
+      header.classList.toggle('active');
+      const content = header.nextElementSibling;
+      
+      if (content.style.display === 'none') {
+        content.style.display = 'block';
+        content.style.animation = 'fadeInUp 0.3s ease-out';
+      } else {
+        content.style.display = 'none';
+      }
+    }
+    
+    function validateForm() {
+      const nameInput = document.getElementById('name');
+      const contentInput = document.getElementById('content');
+      
+      let isValid = true;
+      
+      // Validate name
+      if (!nameInput.value.trim()) {
+        showFieldError(nameInput, '请输入提示词名称');
+        isValid = false;
+      } else {
+        clearFieldError(nameInput);
+      }
+      
+      // Validate content
+      if (!contentInput.value.trim()) {
+        showFieldError(contentInput, '请输入提示词内容');
+        isValid = false;
+      } else {
+        clearFieldError(contentInput);
+      }
+      
+      return isValid;
+    }
+    
+    function showFieldError(field, message) {
+      field.style.borderColor = 'var(--del)';
+      field.style.animation = 'shake 0.5s ease-in-out';
+      
+      // Show error message
+      let errorDiv = field.parentNode.querySelector('.field-error');
+      if (!errorDiv) {
+        errorDiv = document.createElement('div');
+        errorDiv.className = 'field-error';
+        errorDiv.style.cssText = `
+          color: var(--del);
+          font-size: 12px;
+          margin-top: 4px;
+          font-weight: 500;
+        `;
+        field.parentNode.appendChild(errorDiv);
+      }
+      errorDiv.textContent = message;
+      
+      setTimeout(() => {
+        field.style.animation = '';
+      }, 500);
+    }
+    
+    function clearFieldError(field) {
+      field.style.borderColor = '';
+      const errorDiv = field.parentNode.querySelector('.field-error');
+      if (errorDiv) {
+        errorDiv.remove();
+      }
+    }
+    
+    function previewPrompt() {
+      const name = document.getElementById('name').value || '未命名提示词';
+      const content = document.getElementById('content').value || '无内容';
+      
+      document.getElementById('previewName').textContent = name;
+      document.getElementById('previewText').textContent = content;
+      document.getElementById('previewModal').style.display = 'block';
+    }
+    
+    function closePreview() {
+      document.getElementById('previewModal').style.display = 'none';
+    }
+    
+    // Add shake animation
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-5px); }
+        75% { transform: translateX(5px); }
+      }
+      
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    `;
+    document.head.appendChild(style);
+    
+    // Close modal when clicking outside
+    window.addEventListener('click', (e) => {
+      const modal = document.getElementById('previewModal');
+      if (e.target === modal) {
+        closePreview();
+      }
+    });
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      // Ctrl/Cmd + S to save
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        document.querySelector('.prompt-form').dispatchEvent(new Event('submit'));
+      }
+      
+      // Ctrl/Cmd + P to preview
+      if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+        e.preventDefault();
+        previewPrompt();
+      }
+      
+      // Escape to close modal
+      if (e.key === 'Escape') {
+        closePreview();
+      }
+    });
+    
+    // Button actions
+    document.getElementById('resizeBtn')?.addEventListener('click', () => {
+      const textarea = document.getElementById('content');
+      if (textarea.style.height === 'auto') {
+        autoResizeTextarea(textarea);
+      } else {
+        textarea.style.height = 'auto';
+      }
+    });
+    
+    document.getElementById('copyBtn')?.addEventListener('click', async () => {
+      const textarea = document.getElementById('content');
+      const content = textarea.value.trim();
+      
+      if (!content) {
+        showFieldError(textarea, '没有内容可复制');
+        return;
+      }
+      
+      // Check if clipboard API is available
+      if (!navigator.clipboard) {
+        // Fallback to traditional method
+        fallbackCopyTextToClipboard(content);
+        return;
+      }
+      
+      try {
+        await navigator.clipboard.writeText(content);
+        
+        // Show success feedback
+        const btn = document.getElementById('copyBtn');
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i>';
+        btn.style.background = 'var(--ins)';
+        btn.style.color = 'var(--text-on-success)';
+        
+        setTimeout(() => {
+          btn.innerHTML = originalHTML;
+          btn.style.background = '';
+          btn.style.color = '';
+        }, 2000);
+      } catch (err) {
+        console.error('Clipboard API failed:', err);
+        // Fallback to traditional method
+        fallbackCopyTextToClipboard(content);
+      }
+    });
+    
+    function fallbackCopyTextToClipboard(text) {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      
+      // Avoid scrolling to bottom
+      textArea.style.top = "0";
+      textArea.style.left = "0";
+      textArea.style.position = "fixed";
+      
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+          const btn = document.getElementById('copyBtn');
+          const originalHTML = btn.innerHTML;
+          btn.innerHTML = '<i class="fas fa-check"></i>';
+          btn.style.background = 'var(--ins)';
+          btn.style.color = 'var(--text-on-success)';
+          
+          setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.style.background = '';
+            btn.style.color = '';
+          }, 2000);
+        } else {
+          throw new Error('execCommand failed');
+        }
+      } catch (err) {
+        console.error('Fallback copy failed:', err);
+        alert('复制失败，请手动选择文本复制');
+      }
+      
+      document.body.removeChild(textArea);
+    }
+    
+    document.getElementById('clearBtn')?.addEventListener('click', () => {
+      if (confirm('确定要清空内容吗？此操作不可撤销。')) {
+        document.getElementById('content').value = '';
+        updateCharCounter(document.getElementById('content'));
+        document.getElementById('content').focus();
+      }
+    });
+  </script>
+{% endblock %}
