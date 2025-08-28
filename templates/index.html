@@ -158,19 +158,20 @@
     
     .search-form {
       display: flex;
-      flex-direction: column;
+      flex-direction: row;
       gap: var(--spacing-md);
-      align-items: stretch;
+      align-items: center;
       width: 100%;
-      max-width: 600px;
+      max-width: 800px;
+      flex-wrap: wrap;
     }
     
     .search-controls {
       display: flex;
       gap: var(--spacing-md);
       align-items: center;
-      justify-content: center;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      flex-shrink: 0;
     }
     
     .create-section {
@@ -190,23 +191,26 @@
     .create-btn {
       width: 100%;
       max-width: 1200px;
-      padding: var(--spacing-lg);
+      padding: var(--spacing-md);
       font-size: var(--font-size-lg);
       justify-content: center;
       display: flex;
       align-items: center;
       gap: var(--spacing-sm);
       border-radius: var(--radius-xl);
+      height: 52px;
+      box-sizing: border-box;
     }
     
     .search-input-wrapper {
       position: relative;
-      width: 100%;
+      flex: 1;
+      min-width: 200px;
     }
     
     .search-input-wrapper i {
       position: absolute;
-      left: var(--spacing-md);
+      left: var(--spacing-lg);
       top: 50%;
       transform: translateY(-50%);
       color: var(--muted);
@@ -215,13 +219,15 @@
     
     .search-input-wrapper input {
       width: 100%;
-      padding: var(--spacing-md) var(--spacing-md) var(--spacing-md) calc(var(--spacing-md) + 24px);
+      padding: var(--spacing-md) var(--spacing-lg) var(--spacing-md) calc(var(--spacing-lg) + 32px);
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
       background: var(--bg);
       color: var(--fg);
       font-size: var(--font-size-base);
       transition: all 0.3s ease;
+      height: 48px;
+      box-sizing: border-box;
     }
     
     .search-input-wrapper input:focus {
@@ -236,10 +242,15 @@
       border-radius: var(--radius-lg);
       background: var(--bg);
       color: var(--fg);
-      font-size: var(--font-size-base);
+      font-size: var(--font-size-sm);
       cursor: pointer;
       transition: all 0.3s ease;
-      min-width: 140px;
+      min-width: 110px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+      box-sizing: border-box;
     }
     
     .sort-select:focus {
@@ -249,16 +260,23 @@
     }
     
     .search-btn {
-      padding: var(--spacing-md) var(--spacing-lg);
+      padding: var(--spacing-sm) var(--spacing-lg);
       background: var(--primary);
       color: var(--text-on-primary);
       border: none;
       border-radius: var(--radius-lg);
-      font-size: var(--font-size-base);
+      font-size: var(--font-size-sm);
       font-weight: 500;
       cursor: pointer;
       transition: all 0.3s ease;
       white-space: nowrap;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--spacing-xs);
+      flex-shrink: 0;
+      box-sizing: border-box;
     }
     
     .search-btn:hover {
@@ -333,6 +351,7 @@
     
     .card-header {
       margin-bottom: var(--spacing-md);
+      padding-left: var(--spacing-sm);
     }
     
     .card-title-area {
@@ -368,7 +387,21 @@
     
     .card-actions {
       display: flex;
-      gap: var(--spacing-xs);
+      gap: var(--spacing-sm);
+      align-items: center;
+    }
+    
+    .card-actions .icon-btn {
+      min-height: 40px;
+      min-width: 40px;
+      padding: var(--spacing-sm);
+      border-radius: var(--radius-md);
+      transition: all 0.2s ease;
+    }
+    
+    .card-actions .icon-btn:hover {
+      background: color-mix(in srgb, var(--primary) 10%, transparent);
+      transform: scale(1.05);
     }
     
     .card-meta {
@@ -396,18 +429,33 @@
     .card-tags {
       display: flex;
       gap: var(--spacing-sm);
-      margin-top: var(--spacing-md);
+      margin-top: var(--spacing-lg);
       flex-wrap: wrap;
     }
     
+    .tag {
+      background: transparent; 
+      border: 1px dashed var(--border); 
+      padding: var(--spacing-sm) var(--spacing-md); 
+      border-radius: 20px; 
+      font-size: var(--font-size-xs); 
+      color: var(--muted);
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+      min-height: 28px;
+    }
+    
     .card-notes {
-      margin-top: var(--spacing-md);
+      margin-top: var(--spacing-lg);
       font-size: var(--font-size-sm);
       color: var(--fg);
       line-height: 1.6;
       display: flex;
       align-items: flex-start;
-      gap: var(--spacing-xs);
+      gap: var(--spacing-sm);
+      padding: var(--spacing-sm) 0;
     }
     
     .card-notes i {
@@ -416,10 +464,10 @@
     }
     
     .card-preview {
-      margin-top: var(--spacing-md);
-      padding: var(--spacing-md);
+      margin-top: var(--spacing-lg);
+      padding: var(--spacing-sm) var(--spacing-lg) var(--spacing-lg) var(--spacing-lg);
       background: color-mix(in srgb, var(--bg) 30%, var(--card));
-      border-radius: var(--radius-md);
+      border-radius: var(--radius-lg);
       border: 1px solid var(--border);
     }
     
@@ -447,13 +495,15 @@
       border: none;
       color: var(--muted);
       cursor: pointer;
-      padding: 2px 6px;
-      border-radius: var(--radius-sm);
+      padding: var(--spacing-sm);
+      border-radius: var(--radius-md);
       font-size: var(--font-size-xs);
       transition: all 0.2s ease;
       display: flex;
       align-items: center;
       justify-content: center;
+      min-height: 32px;
+      min-width: 32px;
     }
     
     .copy-preview-btn:hover {
@@ -483,21 +533,37 @@
       }
       
       .search-form {
-        max-width: none;
+        flex-direction: column;
+        gap: var(--spacing-md);
+        align-items: stretch;
       }
       
       .search-controls {
-        flex-direction: column;
-        align-items: stretch;
         gap: var(--spacing-sm);
+        flex-wrap: nowrap;
+        width: 100%;
       }
       
       .sort-select {
-        min-width: auto;
+        flex: 3;
+        min-width: 0;
+        font-size: var(--font-size-sm);
       }
       
       .search-btn {
+        flex: 1;
+        padding: var(--spacing-md);
+        font-size: var(--font-size-sm);
+        min-width: 0;
+      }
+      
+      .search-input-wrapper {
         width: 100%;
+        min-width: auto;
+      }
+      
+      .search-input-wrapper input {
+        font-size: var(--font-size-xs);
       }
       
       .create-section {
@@ -512,32 +578,57 @@
       .create-btn {
         max-width: none;
         font-size: var(--font-size-base);
-        padding: var(--spacing-md);
+        padding: var(--spacing-lg);
       }
       
       .stats-bar {
-        gap: var(--spacing-lg);
-        padding: var(--spacing-md);
+        gap: var(--spacing-md);
+        padding: var(--spacing-lg);
+        justify-content: space-around;
       }
       
       .card-title-area {
-        flex-direction: column;
-        align-items: flex-start;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
         gap: var(--spacing-sm);
       }
       
       .card-title {
-        margin-right: 0;
+        margin-right: var(--spacing-sm);
+        font-size: var(--font-size-lg);
       }
       
+      /* 保持元信息水平显示，但优化间距 */
       .card-meta {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: var(--spacing-xs);
+        gap: var(--spacing-md);
+        flex-wrap: wrap;
+        font-size: var(--font-size-xs);
+      }
+      
+      .meta-item {
+        min-width: fit-content;
       }
       
       .card-preview {
-        margin-top: var(--spacing-sm);
+        margin-top: var(--spacing-lg);
+        padding: var(--spacing-xs) var(--spacing-md) var(--spacing-md) var(--spacing-md);
+      }
+      
+      .card-tags {
+        margin-top: var(--spacing-md);
+        gap: var(--spacing-xs);
+      }
+      
+      .tag {
+        font-size: 11px;
+        padding: var(--spacing-xs) var(--spacing-sm);
+        min-height: 24px;
+      }
+      
+      .card-notes {
+        margin-top: var(--spacing-md);
+        font-size: var(--font-size-xs);
       }
     }
   </style>

@@ -1,38 +1,173 @@
 {% extends 'layout.html' %}
-{% block title %}Diff - Prompt 管理器{% endblock %}
+{% block title %}版本对比 - {{ prompt['name'] }} - Prompt 管理器{% endblock %}
 {% block content %}
-  <section class="diff-toolbar">
-    <form method="get" class="diff-select" action="{{ url_for('diff_view', prompt_id=prompt['id']) }}">
-      <label>左（旧）
-        <select name="left">
-          {% for v in versions %}
-            <option value="{{ v['id'] }}" {% if left and v['id']==left['id'] %}selected{% endif %}>{{ v['version'] }} · {{ (v['created_at'] or '')[:19].replace('T',' ') }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>右（新）
-        <select name="right">
-          {% for v in versions %}
-            <option value="{{ v['id'] }}" {% if right and v['id']==right['id'] %}selected{% endif %}>{{ v['version'] }} · {{ (v['created_at'] or '')[:19].replace('T',' ') }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>模式
-        <select name="mode">
-          <option value="word" {% if mode=='word' %}selected{% endif %}>词级</option>
-          <option value="line" {% if mode=='line' %}selected{% endif %}>行级</option>
-        </select>
-      </label>
-      <button class="btn" type="submit">刷新</button>
-      <a class="btn ghost" href="{{ url_for('prompt_detail', prompt_id=prompt['id']) }}">返回</a>
-    </form>
-  </section>
-
-  <section class="diff-view">
-    <h3>{{ prompt['name'] }}</h3>
-    <div class="diff-container">
-      {{ diff_html|safe }}
+  <div class="diff-page">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-main">
+          <h1 class="page-title">
+            <i class="fas fa-code-compare"></i>
+            版本对比
+          </h1>
+          <div class="breadcrumb">
+            <a href="{{ url_for('index') }}" class="breadcrumb-item">
+              <i class="fas fa-home"></i> 首页
+            </a>
+            <span class="breadcrumb-separator">/</span>
+            <a href="{{ url_for('prompt_detail', prompt_id=prompt['id']) }}" class="breadcrumb-item">
+              {{ prompt['name'] }}
+            </a>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-item active">版本对比</span>
+          </div>
+        </div>
+        <div class="header-actions">
+          <a href="{{ url_for('prompt_detail', prompt_id=prompt['id']) }}" class="btn ghost">
+            <i class="fas fa-arrow-left"></i> 返回编辑
+          </a>
+        </div>
+      </div>
     </div>
-  </section>
-{% endblock %}
 
+    <!-- 工具栏 -->
+    <section class="diff-toolbar">
+      <form method="get" class="diff-form" action="{{ url_for('diff_view', prompt_id=prompt['id']) }}">
+        <div class="toolbar-grid">
+          <label class="field field-left">
+            <span class="label"><i class="fas fa-arrow-left"></i> 左（旧）</span>
+            <select name="left" class="version-select">
+              {% for v in versions %}
+                <option value="{{ v['id'] }}" {% if left and v['id']==left['id'] %}selected{% endif %}>{{ v['version'] }} · {{ (v['created_at'] or '')[:19].replace('T',' ') }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <div class="toolbar-right-row">
+            <label class="field field-right">
+              <span class="label"><i class="fas fa-arrow-right"></i> 右（新）</span>
+              <select name="right" class="version-select">
+                {% for v in versions %}
+                  <option value="{{ v['id'] }}" {% if right and v['id']==right['id'] %}selected{% endif %}>{{ v['version'] }} · {{ (v['created_at'] or '')[:19].replace('T',' ') }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="field mode-field">
+              <span class="label"><i class="fas fa-sliders"></i> 模式</span>
+              <select name="mode" class="version-select">
+                <option value="word" {% if mode=='word' %}selected{% endif %}>词级</option>
+                <option value="line" {% if mode=='line' %}selected{% endif %}>行级</option>
+              </select>
+            </label>
+            <div class="actions">
+              <button class="btn primary" type="submit"><i class="fas fa-rotate"></i> 刷新</button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <!-- Diff 内容 -->
+    <section class="diff-view">
+      <div class="diff-card">
+        <div class="diff-header">
+          <div class="side side-left"><i class="fas fa-file-alt"></i> 旧版本：{{ left['version'] }} · {{ (left['created_at'] or '')[:19].replace('T',' ') }}</div>
+          <div class="side side-right"><i class="fas fa-file-alt"></i> 新版本：{{ right['version'] }} · {{ (right['created_at'] or '')[:19].replace('T',' ') }}</div>
+        </div>
+        <div class="diff-container">
+          {{ diff_html|safe }}
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <style>
+    .diff-page { max-width: 1200px; margin: 0 auto; padding: var(--spacing-xl); }
+    .diff-page * { text-align: left; }
+
+    /* 页面头部，复用版本页风格 */
+    .page-header {
+      background: linear-gradient(135deg, var(--primary) 0%, color-mix(in srgb, var(--primary) 80%, var(--card)) 100%);
+      color: var(--text-on-primary);
+      padding: var(--spacing-3xl) var(--spacing-xl);
+      margin: calc(-1 * var(--spacing-xl)) calc(-1 * var(--spacing-xl)) var(--spacing-2xl);
+      border-radius: 0 0 var(--radius-2xl) var(--radius-2xl);
+    }
+    .header-content { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--spacing-lg); }
+    .header-main h1 { font-size: var(--font-size-3xl); font-weight: 700; margin: 0 0 var(--spacing-sm) 0; display: flex; align-items: center; gap: var(--spacing-sm); }
+    .breadcrumb { display: flex; align-items: center; gap: var(--spacing-sm); font-size: var(--font-size-sm); opacity: 0.9; text-align: center !important; }
+    .breadcrumb-item { color: var(--text-on-primary); text-decoration: none; transition: opacity 0.2s ease; }
+    .breadcrumb-item:hover { opacity: 1; text-decoration: underline; }
+    .breadcrumb-item.active { opacity: 1; font-weight: 600; }
+    .breadcrumb-separator { opacity: 0.7; }
+    .header-actions { text-align: center !important; }
+
+    /* 工具栏 */
+    .diff-toolbar { margin-bottom: var(--spacing-2xl); }
+    .diff-form { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: var(--spacing-lg); box-shadow: 0 2px 8px var(--shadow); }
+    /* 工具栏与下方左右列对齐：两等分列（左列一个，右列整体一行） */
+    .toolbar-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-lg); align-items: end; width: 100%; }
+    .field { display: grid; gap: var(--spacing-xs); min-width: 0; }
+    .field-left { grid-column: 1; }
+    .toolbar-right-row { grid-column: 2; display: flex; align-items: end; gap: var(--spacing-lg); }
+    .field-right { flex: 1 1 0; min-width: 0; }
+    .mode-field { flex: 0 0 220px; }
+    .field .label { font-size: var(--font-size-sm); font-weight: 600; color: var(--muted); display: inline-flex; align-items: center; gap: var(--spacing-xs); }
+    .version-select { cursor: pointer; min-width: 0; width: 100%; }
+    .actions { display: flex; gap: var(--spacing-md); justify-content: flex-end; align-items: center; margin-left: auto; }
+
+    /* Diff 卡片 */
+    .diff-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); overflow: hidden; box-shadow: 0 4px 16px var(--shadow); }
+    .diff-header { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-md); padding: var(--spacing-lg); border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--bg) 50%, transparent); font-size: var(--font-size-sm); color: var(--muted); }
+    .diff-header .side { display: flex; align-items: center; gap: var(--spacing-xs); }
+    .side-left { justify-content: flex-start; }
+    .side-right { justify-content: flex-end; }
+
+    .diff-container { padding: var(--spacing-lg); overflow: auto; background: var(--bg); }
+    .diff-container table { width: 100%; border-collapse: separate; border-spacing: 0; font-family: 'Consolas','Monaco','SF Mono',monospace; font-size: var(--font-size-xs); }
+    .diff-container th, .diff-container td { vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+    .diff-container thead th { position: sticky; top: 0; z-index: 1; background: color-mix(in srgb, var(--card) 80%, transparent); color: var(--muted); text-align: left; }
+    .diff-container tr:hover td { background: color-mix(in srgb, var(--primary) 5%, transparent); }
+
+    /* 自定义词级 diff 标注 */
+    .diff-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+    .diff-table .cell-left, .diff-table .cell-right { width: 50%; }
+    .diff-ins { background: color-mix(in srgb, var(--ins) 20%, transparent); color: inherit; border-radius: 3px; padding: 0 2px; }
+    .diff-del { background: color-mix(in srgb, var(--del) 20%, transparent); color: inherit; border-radius: 3px; padding: 0 2px; text-decoration: none; }
+    tr.ins td { background: color-mix(in srgb, var(--ins) 10%, transparent); }
+    tr.del td { background: color-mix(in srgb, var(--del) 10%, transparent); }
+    tr.chg td { background: color-mix(in srgb, var(--warning) 10%, transparent); }
+
+    /* HtmlDiff 默认类名适配 */
+    .line-diff .diff { width: 100%; border-collapse: separate; border-spacing: 0; font-family: 'Consolas','Monaco','SF Mono',monospace; font-size: var(--font-size-xs); }
+    .line-diff .diff th { background: color-mix(in srgb, var(--card) 80%, transparent); color: var(--muted); border-bottom: 1px solid var(--border); padding: 6px 8px; }
+    .line-diff .diff td { border-bottom: 1px solid var(--border); padding: 6px 8px; }
+    .line-diff .diff .diff_header { background: color-mix(in srgb, var(--card) 80%, transparent); color: var(--muted); }
+    .line-diff .diff .diff_add { background: color-mix(in srgb, var(--ins) 10%, transparent); }
+    .line-diff .diff .diff_chg { background: color-mix(in srgb, var(--warning) 10%, transparent); }
+    .line-diff .diff .diff_sub { background: color-mix(in srgb, var(--del) 10%, transparent); }
+    .line-diff .diff tbody tr:hover td { background: color-mix(in srgb, var(--primary) 5%, transparent); }
+
+    @media (max-width: 768px) {
+      .header-main h1 { font-size: var(--font-size-2xl); }
+      .diff-header { grid-template-columns: 1fr; text-align: left; }
+      .side-right { justify-content: flex-start; }
+      /* 移动端两行布局：
+         第1行：左(旧) | 右(新)
+         第2行：模式   | 刷新按钮 */
+      .toolbar-grid { grid-template-columns: 1fr 1fr; grid-auto-rows: auto; }
+      .toolbar-right-row { display: contents; }
+      .field-left { grid-column: 1; grid-row: 1; }
+      .field-right { grid-column: 2; grid-row: 1; }
+      .mode-field { grid-column: 1; grid-row: 2; }
+      .field, .field-right, .mode-field { min-width: 0; }
+      .version-select { min-width: 0; width: 100%; }
+      .actions { grid-column: 2; grid-row: 2; justify-content: flex-end; width: auto; margin-left: 0; }
+      .actions .btn { width: auto; }
+    }
+    @media (max-width: 480px) {
+      .diff-form { padding: var(--spacing-md); }
+      .diff-header, .diff-container { padding: var(--spacing-md); }
+      .mode-field { flex-basis: 160px; }
+    }
+  </style>
+{% endblock %}

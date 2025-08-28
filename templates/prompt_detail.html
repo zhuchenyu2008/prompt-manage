@@ -10,13 +10,6 @@
         提示词编辑
       {% endif %}
     </h1>
-    <p class="page-subtitle">
-      {% if prompt %}
-        编辑 "{{ prompt['name'] }}" 的内容和属性
-      {% else %}
-        创建新的提示词
-      {% endif %}
-    </p>
   </div>
 
   <div class="prompt-editor-container">
@@ -25,7 +18,7 @@
         <i class="fas fa-arrow-left"></i> 返回列表
       </a>
       {% if prompt %}
-        <a class="btn" href="{{ url_for('versions_page', prompt_id=prompt['id']) }}">
+        <a class="btn ghost" href="{{ url_for('versions_page', prompt_id=prompt['id']) }}">
           <i class="fas fa-history"></i> 历史版本
         </a>
       {% endif %}
@@ -187,25 +180,22 @@
 
   <style>
     .page-header {
-      text-align: center;
+      text-align: left;
       margin-bottom: var(--spacing-3xl);
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+      padding: 0 var(--spacing-xl);
     }
     
     .page-title {
       font-size: var(--font-size-3xl);
       font-weight: 700;
       color: var(--primary);
-      margin: 0 0 var(--spacing-sm) 0;
+      margin: 0;
       display: flex;
       align-items: center;
-      justify-content: center;
       gap: var(--spacing-sm);
-    }
-    
-    .page-subtitle {
-      font-size: var(--font-size-lg);
-      color: var(--muted);
-      margin: 0;
     }
     
     .prompt-editor-container {
@@ -653,22 +643,24 @@
     @media (max-width: 768px) {
       .page-header {
         margin-bottom: var(--spacing-2xl);
+        text-align: left;
       }
       
       .page-title {
         font-size: var(--font-size-2xl);
-        flex-direction: column;
-        gap: var(--spacing-xs);
       }
       
       .breadcrumb-nav {
-        flex-direction: column;
-        gap: var(--spacing-sm);
+        flex-direction: row;
+        gap: var(--spacing-md);
+        justify-content: space-between;
+        align-items: center;
       }
       
       .breadcrumb-nav .btn {
-        width: 100%;
+        flex: 1;
         justify-content: center;
+        max-width: none;
       }
       
       .form-grid {
@@ -734,18 +726,22 @@
   </style>
 
   <script>
+    // Auto-resize toggle state (default: off)
+    let autoResizeEnabled = false;
+
     document.addEventListener('DOMContentLoaded', () => {
       // Initialize form interactions
       initializeForm();
       
-      // Auto-resize textarea
+      // Textarea setup (no auto-resize by default)
       const textarea = document.getElementById('content');
       if (textarea) {
-        autoResizeTextarea(textarea);
         updateCharCounter(textarea);
         
         textarea.addEventListener('input', () => {
-          autoResizeTextarea(textarea);
+          if (autoResizeEnabled) {
+            autoResizeTextarea(textarea);
+          }
           updateCharCounter(textarea);
         });
       }
@@ -1043,10 +1039,13 @@
     // Button actions
     document.getElementById('resizeBtn')?.addEventListener('click', () => {
       const textarea = document.getElementById('content');
-      if (textarea.style.height === 'auto') {
+      autoResizeEnabled = !autoResizeEnabled;
+      if (autoResizeEnabled) {
         autoResizeTextarea(textarea);
+        document.getElementById('resizeBtn').title = '已开启自动调整大小';
       } else {
-        textarea.style.height = 'auto';
+        textarea.style.height = '';
+        document.getElementById('resizeBtn').title = '自动调整大小';
       }
     });
     
