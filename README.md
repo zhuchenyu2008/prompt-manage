@@ -1,6 +1,6 @@
 # Prompt 管理器
 
-一个功能完整的本地提示词管理系统，支持版本控制、搜索、标签管理、导入导出等企业级功能。采用 Flask + SQLite 构建，无需外部依赖，开箱即用。
+一个功能完整的本地提示词管理系统，支持版本控制、搜索、标签管理、导入导出等功能。采用 Python + Flask + SQLite 构建，无需外部依赖，开箱即用。
 
 ## ✨ 核心功能
 
@@ -49,7 +49,7 @@
 
 1. **克隆项目**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/zhuchenyu2008/prompt-manage
    cd prompt
    ```
 
@@ -82,7 +82,7 @@ docker run -d -p 3501:3501 -v prompt-data:/app/data prompt-manager
 
 1. **克隆或下载项目**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/zhuchenyu2008/prompt-manage
    cd prompt
    ```
 
@@ -243,10 +243,3 @@ app.run(host='0.0.0.0', port=3501, debug=True)
 - ✅ 简化的用户界面
 - ✅ 增强的颜色主题系统
 
-## 📄 许可证
-
-本项目采用 MIT 许可证，可自由使用和修改。
-
----
-
-**提示**: 这是一个完全本地的应用，您的所有数据都存储在本地，不会上传到任何云端服务器。
