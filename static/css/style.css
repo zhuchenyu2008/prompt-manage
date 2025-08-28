@@ -118,6 +118,7 @@ body {
   backdrop-filter: blur(12px);
   background: color-mix(in srgb, var(--bg) 90%, transparent);
   box-shadow: 0 2px 10px var(--shadow);
+  min-height: 60px;
 }
 .brand a { 
   font-weight: 700; 
@@ -127,15 +128,23 @@ body {
   align-items: center;
   gap: var(--spacing-sm);
   color: var(--primary);
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-md);
+  min-height: 44px;
 }
 .brand a:hover { 
   transform: translateX(2px);
   text-decoration: none;
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
 }
 .brand a::before { 
   display: none; 
 }
-.nav { display: flex; gap: var(--spacing-md); }
+.nav { 
+  display: flex; 
+  gap: var(--spacing-lg); 
+  align-items: center;
+}
 .container { 
   max-width: 1200px;
   padding: var(--spacing-xl);
@@ -143,12 +152,12 @@ body {
   min-height: calc(100vh - 70px);
 }
 
-/* Enhanced buttons with ripple effect */
+/* Enhanced buttons with ripple effect and touch-friendly sizing */
 .btn { 
   border: 1px solid var(--border); 
   background: transparent; 
   color: var(--fg); 
-  padding: var(--spacing-sm) var(--spacing-lg); 
+  padding: var(--spacing-md) var(--spacing-xl); 
   border-radius: var(--radius-lg); 
   cursor: pointer; 
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -158,9 +167,12 @@ body {
   font-size: var(--font-size-sm);
   display: inline-flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  gap: var(--spacing-sm);
   text-decoration: none;
   border: none;
+  min-height: 44px;
+  min-width: 44px;
+  justify-content: center;
 }
 .btn::before {
   content: '';
@@ -200,24 +212,31 @@ body {
 }
 .btn.ghost { 
   background: transparent; 
-  border: 1px solid transparent;
+  border: 1px solid var(--border);
 }
 .btn.ghost:hover {
-  border-color: var(--border);
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
 }
 .icon-btn { 
   background: transparent; 
-  border: none; 
+  border: 1px solid var(--border); 
   cursor: pointer; 
   font-size: var(--font-size-lg);
   transition: all 0.2s ease;
   border-radius: var(--radius-md);
-  padding: var(--spacing-sm);
+  padding: var(--spacing-md);
   color: var(--fg);
+  min-height: 44px;
+  min-width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .icon-btn:hover {
-  background: var(--card);
-  transform: scale(1.1);
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
+  border-color: var(--primary);
+  transform: scale(1.05);
 }
 .inline { display: inline; }
 
@@ -313,14 +332,17 @@ body {
 }
 input[type="text"], input[type="number"], select, textarea { 
   width: 100%; 
-  padding: var(--spacing-sm) var(--spacing-md); 
+  padding: var(--spacing-md) var(--spacing-lg); 
   border-radius: var(--radius-lg); 
   border: 1px solid var(--border); 
   background: transparent; 
   color: var(--fg);
   transition: all 0.3s ease;
   font-family: inherit;
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-base);
+  min-height: 48px;
+  display: flex;
+  align-items: center;
 }
 input[type="text"]:focus, input[type="number"]:focus, select:focus, textarea:focus {
   outline: none;
@@ -328,7 +350,8 @@ input[type="text"]:focus, input[type="number"]:focus, select:focus, textarea:foc
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
 }
 .search-input-wrapper input {
-  padding-left: calc(var(--spacing-md) + 24px);
+  padding-left: calc(var(--spacing-lg) + 32px);
+  padding-right: var(--spacing-lg);
 }
 textarea { 
   resize: vertical; 
@@ -698,18 +721,21 @@ textarea {
     padding: var(--spacing-lg); 
   }
   .topbar { 
-    padding: var(--spacing-sm) var(--spacing-lg); 
+    padding: var(--spacing-md) var(--spacing-lg); 
+    min-height: 56px;
   }
   .brand a { 
-    font-size: var(--font-size-lg); 
+    font-size: var(--font-size-lg);
+    padding: var(--spacing-xs) var(--spacing-sm);
   }
   .nav { 
-    gap: var(--spacing-sm); 
+    gap: var(--spacing-md); 
   }
   .toolbar { 
     flex-direction: column; 
     align-items: stretch; 
     gap: var(--spacing-lg);
+    padding: var(--spacing-lg);
   }
   .search-form { 
     min-width: auto; 
@@ -723,33 +749,32 @@ textarea {
     gap: var(--spacing-lg);
   }
   .meta { 
-    gap: var(--spacing-sm); 
-    flex-direction: column; 
-    align-items: flex-start; 
+    gap: var(--spacing-md); 
+    flex-wrap: wrap;
   }
   .actions { 
-    gap: var(--spacing-sm); 
+    gap: var(--spacing-md); 
     flex-wrap: wrap;
   }
   .btn {
-    padding: var(--spacing-xs) var(--spacing-md);
-    font-size: var(--font-size-xs);
+    padding: var(--spacing-md) var(--spacing-lg);
+    font-size: var(--font-size-sm);
   }
   .list {
-    gap: var(--spacing-lg);
+    gap: var(--spacing-xl);
   }
   .card {
-    padding: var(--spacing-lg);
+    padding: var(--spacing-xl);
   }
   .fold {
     margin: var(--spacing-lg) 0;
   }
   .fold > summary {
-    padding: var(--spacing-md) var(--spacing-lg);
-    font-size: var(--font-size-sm);
+    padding: var(--spacing-lg);
+    font-size: var(--font-size-base);
   }
   .fold .fold-body {
-    padding: 0 var(--spacing-lg) var(--spacing-lg);
+    padding: 0 var(--spacing-xl) var(--spacing-xl);
   }
 }
 
@@ -757,39 +782,141 @@ textarea {
   .container {
     padding: var(--spacing-md);
   }
+  .topbar {
+    padding: var(--spacing-sm) var(--spacing-md);
+    min-height: 52px;
+  }
   .brand a {
     font-size: var(--font-size-base);
+    padding: var(--spacing-xs);
+    gap: var(--spacing-xs);
   }
-  .brand a::before {
-    font-size: var(--font-size-lg);
+  .nav {
+    gap: var(--spacing-sm);
+  }
+  .btn {
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-xs);
+    min-height: 40px;
+    min-width: 40px;
+  }
+  .icon-btn {
+    min-height: 36px;
+    min-width: 36px;
+    padding: var(--spacing-xs);
   }
   .card {
-    padding: var(--spacing-md);
+    padding: var(--spacing-lg);
   }
   .card .title {
     font-size: var(--font-size-base);
   }
   .meta {
     font-size: 11px;
+    gap: var(--spacing-sm);
   }
   .tag {
-    font-size: 11px;
-    padding: 2px 6px;
+    font-size: 10px;
+    padding: 3px 8px;
+    min-height: 22px;
   }
   .notes {
     font-size: var(--font-size-xs);
   }
+  input[type="text"], input[type="number"], select, textarea {
+    min-height: 44px;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-sm);
+  }
+  .search-input-wrapper input {
+    padding-left: calc(var(--spacing-md) + 28px);
+  }
+  .search-input-wrapper i {
+    left: var(--spacing-sm);
+  }
 }
 
-/* Theme toggle animation */
+/* Accessibility and performance optimizations for mobile */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  .btn::before {
+    display: none;
+  }
+  
+  .icon-btn:hover {
+    transform: none;
+  }
+  
+  .card:hover {
+    transform: none;
+  }
+}
+
+/* Mobile performance optimizations */
+@media (max-width: 768px) {
+  /* Reduce expensive effects on mobile */
+  .topbar {
+    backdrop-filter: none;
+    background: var(--bg);
+  }
+  
+  .btn::before {
+    display: none;
+  }
+  
+  .btn:hover::before {
+    display: none;
+  }
+  
+  .icon-btn:hover {
+    transform: scale(1.02);
+  }
+  
+  .card::before {
+    display: none;
+  }
+  
+  .card:hover {
+    transform: translateY(-2px);
+  }
+  
+  /* Simplify animations for better performance */
+  .flash {
+    animation: slideInRightSimple 0.3s ease-out;
+  }
+}
+
+@keyframes slideInRightSimple {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+
+
+/* Theme toggle animation - mobile optimized */
 #themeToggle {
-  transition: transform 0.3s ease;
-}
-#themeToggle:hover {
-  transform: rotate(180deg);
+  transition: transform 0.2s ease;
 }
 
+@media (min-width: 769px) {
+  #themeToggle:hover {
+    transform: rotate(180deg);
+  }
+}
 
+@media (max-width: 768px) {
+  #themeToggle:hover {
+    transform: scale(1.05);
+  }
+}
 
 /* Icon spacing */
 .btn i, .title i, .meta i, .tag i, .notes i {

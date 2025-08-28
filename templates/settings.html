@@ -1,6 +1,12 @@
 {% extends 'layout.html' %}
 {% block title %}设置 - Prompt 管理器{% endblock %}
 {% block content %}
+  <div class="back-line">
+    <a href="{{ url_for('index') }}" class="btn ghost back-btn" onclick="if (window.history.length > 1) { history.back(); return false; }">
+      <i class="fas fa-arrow-left"></i>
+      返回
+    </a>
+  </div>
   <div class="page-header">
     <h1 class="page-title">
       <i class="fas fa-cog"></i>
@@ -10,11 +16,6 @@
   </div>
 
   <div class="settings-container">
-    <div class="actions breadcrumb-nav">
-      <a class="btn ghost" href="{{ url_for('index') }}">
-        <i class="fas fa-arrow-left"></i> 返回首页
-      </a>
-    </div>
 
     <form method="post" enctype="multipart/form-data" class="settings-form">
       <div class="settings-section">
@@ -96,6 +97,19 @@
   </div>
 
   <style>
+    .back-line {
+      max-width: 800px;
+      margin: 0 auto var(--spacing-lg);
+      display: flex;
+      justify-content: flex-start;
+    }
+
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+    }
+
     .page-header {
       text-align: center;
       margin-bottom: var(--spacing-3xl);
@@ -122,10 +136,6 @@
     .settings-container {
       max-width: 800px;
       margin: 0 auto;
-    }
-    
-    .breadcrumb-nav {
-      margin-bottom: var(--spacing-xl);
     }
     
     .settings-form {
