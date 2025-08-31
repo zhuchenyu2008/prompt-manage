@@ -46,6 +46,27 @@
 #### 环境要求
 - Docker 和 Docker Compose
 
+#### 使用官方镜像
+
+- **镜像地址**：`docker.io/zhuchenyu2008/prompt-manage:latest`
+
+```bash
+# 拉取镜像
+docker pull zhuchenyu2008/prompt-manage:latest
+
+# 运行容器（持久化数据到名为 prompt-data 的卷）
+docker run -d \
+  --name prompt-manage \
+  -p 3501:3501 \
+  -v prompt-data:/app/data \
+  zhuchenyu2008/prompt-manage:latest
+
+# 访问应用
+# http://localhost:3501
+```
+
+> 如果你在中国大陆网络环境，建议配置镜像加速器以提升拉取速度。
+
 #### 使用 Docker Compose
 
 1. **克隆项目**
@@ -54,7 +75,7 @@
    cd prompt
    ```
 
-2. **启动应用**
+2. **启动应用（本地构建）**
    ```bash
    # 启动服务
    docker-compose up
@@ -63,15 +84,52 @@
    ```
    访问：http://localhost:3501
 
+3. **使用官方镜像（生产推荐）**
+   若希望直接使用已发布的官方镜像，可将 `docker-compose.yml` 中的 `build:` 替换为：
+   ```yaml
+   services:
+     prompt-manager:
+       image: zhuchenyu2008/prompt-manage:latest
+       ports:
+         - "3501:3501"
+       volumes:
+         - prompt-data:/app/data
+       environment:
+         - FLASK_ENV=production
+       restart: unless-stopped
+   ```
+
 #### 使用单独的 Docker
 
 ```bash
-# 构建镜像
+# 构建镜像（本地开发场景）
 docker build -t prompt-manager .
 
 # 运行容器
 docker run -d -p 3501:3501 -v prompt-data:/app/data prompt-manager
 ```
+
+### 发布镜像到 Docker Hub
+
+以下为将镜像推送到 Docker Hub 的标准流程（已在本仓库验证）：
+
+```bash
+# 1) 登录 Docker Hub（建议使用 Personal Access Token）
+docker login -u <your-dockerhub-username>
+# 出现密码提示时，输入你的密码或 PAT
+
+# 2) 使用你的命名空间与仓库名进行构建与打标签
+docker build -t zhuchenyu2008/prompt-manage:latest .
+
+# 3) 推送到 Docker Hub
+docker push zhuchenyu2008/prompt-manage:latest
+```
+
+注意事项：
+- 如遇到 `unauthorized: incorrect username or password`，请确认用户名与密码；
+  建议在 https://app.docker.com/settings 创建 PAT 并作为密码使用。
+- 首次登录时若看到“凭据未加密存储”的提示，建议配置凭据助手：
+  https://docs.docker.com/go/credential-store/
 
 ### 方式二：本地 Python 运行
 
@@ -260,4 +318,3 @@ app.run(host='0.0.0.0', port=3501, debug=True)
 - ✅ 动态页面标题显示
 - ✅ 简化的用户界面
 - ✅ 增强的颜色主题系统
-
