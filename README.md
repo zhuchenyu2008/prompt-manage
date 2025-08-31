@@ -65,7 +65,7 @@ docker run -d \
 # http://localhost:3501
 ```
 
-> 如果你在中国大陆网络环境，建议配置镜像加速器以提升拉取速度。
+
 
 #### 使用 Docker Compose
 
@@ -84,7 +84,7 @@ docker run -d \
    ```
    访问：http://localhost:3501
 
-3. **使用官方镜像（生产推荐）**
+3. **使用以构建的镜像（生产推荐）**
    若希望直接使用已发布的官方镜像，可将 `docker-compose.yml` 中的 `build:` 替换为：
    ```yaml
    services:
@@ -109,27 +109,6 @@ docker build -t prompt-manager .
 docker run -d -p 3501:3501 -v prompt-data:/app/data prompt-manager
 ```
 
-### 发布镜像到 Docker Hub
-
-以下为将镜像推送到 Docker Hub 的标准流程（已在本仓库验证）：
-
-```bash
-# 1) 登录 Docker Hub（建议使用 Personal Access Token）
-docker login -u <your-dockerhub-username>
-# 出现密码提示时，输入你的密码或 PAT
-
-# 2) 使用你的命名空间与仓库名进行构建与打标签
-docker build -t zhuchenyu2008/prompt-manage:latest .
-
-# 3) 推送到 Docker Hub
-docker push zhuchenyu2008/prompt-manage:latest
-```
-
-注意事项：
-- 如遇到 `unauthorized: incorrect username or password`，请确认用户名与密码；
-  建议在 https://app.docker.com/settings 创建 PAT 并作为密码使用。
-- 首次登录时若看到“凭据未加密存储”的提示，建议配置凭据助手：
-  https://docs.docker.com/go/credential-store/
 
 ### 方式二：本地 Python 运行
 
