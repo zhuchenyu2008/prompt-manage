@@ -1,3 +1,5 @@
+html { color-scheme: light dark; }
+
 :root {
   --bg: #ffffff;
   --fg: #111111;
@@ -48,6 +50,56 @@
   --radius-lg: 12px;
   --radius-xl: 16px;
   --radius-2xl: 20px;
+}
+[data-theme="light"]:root {
+  /* 手动浅色覆盖，确保不受系统影响 */
+  --bg: #ffffff;
+  --fg: #111111;
+  --muted: #666;
+  --card: #f6f6f6;
+  --border: #e6e6e6;
+  --primary: #111;
+  --ins: #0b8b0b;
+  --del: #b00020;
+  --shadow: rgba(0, 0, 0, 0.1);
+  --shadow-hover: rgba(0, 0, 0, 0.15);
+  --success: #28a745;
+  --error: #dc3545;
+  --info: #17a2b8;
+  --warning: #ffbf00;
+  --star: #ffc107;
+  --text-on-primary: white;
+  --text-on-success: white;
+  --text-on-error: white;
+  --text-on-info: white;
+  --text-on-warning: black;
+  --print-border: #ccc;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* 自动跟随系统的暗色变量 */
+    --bg: #0e0e0f;
+    --fg: #e6e6e6;
+    --muted: #9aa0a6;
+    --card: #17181a;
+    --border: #2a2b2e;
+    --primary: #fff;
+    --ins: #3bd13b;
+    --del: #ff5c7a;
+    --shadow: rgba(0, 0, 0, 0.3);
+    --shadow-hover: rgba(0, 0, 0, 0.5);
+    --success: #34a853;
+    --error: #ea4335;
+    --info: #4285f4;
+    --warning: #fbbc04;
+    --star: #fdd663;
+    --text-on-primary: black;
+    --text-on-success: white;
+    --text-on-error: white;
+    --text-on-info: white;
+    --text-on-warning: black;
+    --print-border: #666;
+  }
 }
 [data-theme="dark"]:root {
   --bg: #0e0e0f;

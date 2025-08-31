@@ -7,7 +7,8 @@ from werkzeug.utils import secure_filename
 from io import BytesIO
 
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'data.sqlite3')
+# Database path: allow override via env, default to container volume
+DB_PATH = os.environ.get('DB_PATH', '/app/data/data.sqlite3')
 
 
 def get_db():
@@ -150,6 +151,12 @@ def get_all_tags(conn):
 
 
 def ensure_db():
+    # Ensure parent directory exists to avoid 'unable to open database file'
+    try:
+        os.makedirs(os.path.dirname(DB_PATH) or '.', exist_ok=True)
+    except Exception:
+        # best-effort; continue to let sqlite raise helpful error if needed
+        pass
     if not os.path.exists(DB_PATH):
         init_db()
 
@@ -170,6 +177,13 @@ def index():
     conn = get_db()
     q = request.args.get('q', '').strip()
     sort = request.args.get('sort', 'updated')  # updated|created|name|tags
+    # 多选筛选：支持 ?tag=a&tag=b 与 ?tags=a,b，两者合并
+    selected_tags = [t for t in request.args.getlist('tag') if t.strip()]
+    if not selected_tags and request.args.get('tags'):
+        selected_tags = [t.strip() for t in request.args.get('tags', '').replace('，', ',').split(',') if t.strip()]
+    selected_sources = [s for s in request.args.getlist('source') if s.strip()]
+    if not selected_sources and request.args.get('sources'):
+        selected_sources = [s.strip() for s in request.args.get('sources', '').replace('，', ',').split(',') if s.strip()]
     order_clause = 'pinned DESC,'
     if sort == 'created':
         order_clause += ' created_at DESC, id DESC'
@@ -194,10 +208,54 @@ def index():
     sql += f" ORDER BY {order_clause}"
     prompts = conn.execute(sql, params).fetchall()
 
+    # 在当前搜索范围内统计标签与来源计数（便于侧边栏显示）
+    tag_counts = {}
+    source_counts = {}
+    def norm_source(s):
+        return (s or '').strip() or '(empty)'
+    for r in prompts:
+        # tags 存储为 JSON 文本
+        try:
+            arr = json.loads(r['tags']) if r['tags'] else []
+        except Exception:
+            arr = []
+        for t in arr:
+            tag_counts[t] = tag_counts.get(t, 0) + 1
+        s = norm_source(r['source'])
+        source_counts[s] = source_counts.get(s, 0) + 1
+
+    # 应用多选筛选：同一维度内为 OR；不同维度之间 AND
+    def include_row(row):
+        # 解析行 tags
+        try:
+            row_tags = json.loads(row['tags']) if row['tags'] else []
+        except Exception:
+            row_tags = []
+        ok_tag = True
+        if selected_tags:
+            ok_tag = any(t in row_tags for t in selected_tags)
+        ok_src = True
+        if selected_sources:
+            ok_src = norm_source(row['source']) in selected_sources
+        return ok_tag and ok_src
+
+    if selected_tags or selected_sources:
+        prompts = [r for r in prompts if include_row(r)]
+
     # 标签汇总用于输入联想
     tag_suggestions = get_all_tags(conn)
     conn.close()
-    return render_template('index.html', prompts=prompts, q=q, sort=sort, tag_suggestions=tag_suggestions)
+    return render_template(
+        'index.html',
+        prompts=prompts,
+        q=q,
+        sort=sort,
+        tag_suggestions=tag_suggestions,
+        tag_counts=tag_counts,
+        source_counts=source_counts,
+        selected_tags=selected_tags,
+        selected_sources=selected_sources,
+    )
 
 
 @app.route('/prompt/new', methods=['GET', 'POST'])
