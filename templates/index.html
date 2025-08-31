@@ -62,7 +62,14 @@
         </div>
       </div>
 
-      <div class="list">
+      <!-- 视图切换（桌面端） -->
+      <div class="view-toggle" title="切换布局" aria-label="切换布局">
+        <button id="viewModeToggle" class="icon-btn small" aria-pressed="false">
+          <i class="fas fa-table-cells"></i>
+        </button>
+      </div>
+
+      <div id="promptList" class="list grid-view">
         {% for p in prompts %}
           <article class="card" style="animation-delay: {{ loop.index * 0.1 }}s;">
             <div class="card-header">
@@ -146,6 +153,53 @@
   </div>
 
   <style>
+    /* === 主页视图切换 + 网格卡片布局 === */
+    .view-toggle {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin: -8px 0 var(--spacing-md) 0;
+    }
+    .icon-btn.small {
+      min-height: 32px;
+      min-width: 32px;
+      padding: 6px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .icon-btn.small:hover {
+      color: var(--primary);
+      background: color-mix(in srgb, var(--primary) 8%, transparent);
+      transform: scale(1.05);
+    }
+    .icon-btn.small[aria-pressed="true"] {
+      color: var(--bg);
+      background: var(--fg);
+      border-color: var(--fg);
+    }
+
+    /* 网格视图（桌面端） */
+    #promptList.grid-view {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: var(--spacing-xl);
+    }
+    /* 列表视图 */
+    #promptList.list-view {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--spacing-xl);
+    }
+    /* 移动端保持单列并隐藏切换 */
+    @media (max-width: 768px) {
+      .view-toggle { display: none; }
+      #promptList { grid-template-columns: 1fr !important; }
+    }
+
     .toolbar {
       display: flex;
       justify-content: center;
@@ -634,6 +688,51 @@
   </style>
   
   <script>
+    // 视图切换：在桌面端于列表上方显示，按钮图标在网格/列表间切换
+    (function() {
+      const listEl = document.getElementById('promptList');
+      const btn = document.getElementById('viewModeToggle');
+      if (!listEl || !btn) return;
+
+      // 仅桌面端展示切换
+      const isDesktop = () => window.matchMedia('(min-width: 769px)').matches;
+
+      // 恢复偏好
+      const saved = localStorage.getItem('viewMode') || 'grid';
+      setMode(saved);
+
+      // 绑定事件
+      btn.addEventListener('click', () => {
+        const next = listEl.classList.contains('grid-view') ? 'list' : 'grid';
+        setMode(next);
+        localStorage.setItem('viewMode', next);
+      });
+
+      // 根据窗口变化（如缩放到移动端）调整可见性与布局
+      window.addEventListener('resize', () => {
+        if (!isDesktop()) {
+          btn.setAttribute('aria-pressed', 'false');
+        } else {
+          const current = localStorage.getItem('viewMode') || 'grid';
+          setMode(current);
+        }
+      });
+
+      function setMode(mode) {
+        if (mode === 'list') {
+          listEl.classList.remove('grid-view');
+          listEl.classList.add('list-view');
+          btn.setAttribute('aria-pressed', 'true');
+          btn.innerHTML = '<i class="fas fa-list"></i>';
+        } else {
+          listEl.classList.remove('list-view');
+          listEl.classList.add('grid-view');
+          btn.setAttribute('aria-pressed', 'false');
+          btn.innerHTML = '<i class="fas fa-table-cells"></i>';
+        }
+      }
+    })();
+
     async function copyPreviewContent(button) {
       const content = button.getAttribute('data-content');
       
