@@ -1,6 +1,6 @@
 # Prompt 管理器
 
-一个功能完整的本地提示词管理系统，支持版本控制、搜索、标签管理、导入导出等企业级功能。采用 Flask + SQLite 构建，无需外部依赖，开箱即用。
+一个功能完整的本地提示词管理系统，支持版本控制、搜索、标签管理、导入导出功能。采用Python + Flask + SQLite 构建，无需外部依赖，开箱即用。
 
 ## ✨ 核心功能
 
@@ -28,7 +28,7 @@
 - **多维度筛选**：支持按标签排序和筛选
 
 ### 🎨 用户体验
-- **双主题支持**：浅色/深色主题，自动跟随系统偏好
+- **双主题支持**：浅色/深色主题，自动跟随系统
 - **响应式设计**：完美适配桌面端和移动端
 - **流畅动画**：精心设计的交互动画和过渡效果
 - **键盘快捷键**：支持 Ctrl+S 保存、Ctrl+P 预览等快捷操作
@@ -100,7 +100,9 @@ docker run -d -p 3501:3501 -v prompt-data:/app/data prompt-manager
 4. **访问应用**
    打开浏览器访问：http://localhost:3501
 
-> **注意**：首次运行会自动创建 `data.sqlite3` 数据库文件，无需手动配置。
+> 注意：应用会在首次运行时自动创建数据库文件。
+> - 容器/Compose 环境：默认路径为 `/app/data/data.sqlite3`（已挂载为持久化卷），无需额外配置。
+> - 本地直跑（非 Docker）：请通过环境变量覆盖路径，例如 `DB_PATH=./data.sqlite3 python app.py`，数据库将创建在项目根目录。
 
 ## 📁 项目结构
 
@@ -108,7 +110,7 @@ docker run -d -p 3501:3501 -v prompt-data:/app/data prompt-manager
 prompt/
 ├── app.py              # Flask 应用主文件
 ├── requirements.txt    # Python 依赖文件
-├── data.sqlite3        # SQLite 数据库文件(自动创建)
+├── data.sqlite3        # 本地运行时可选的数据库文件（通过 DB_PATH 指向）
 ├── Dockerfile          # Docker 镜像配置
 ├── docker-compose.yml  # Docker Compose 配置文件
 ├── .dockerignore       # Docker 构建忽略文件
@@ -237,10 +239,17 @@ app.run(host='0.0.0.0', port=3501, debug=True)
 1. **依赖缺失**：运行 `pip install flask` 安装 Flask 框架
 2. **端口占用**：修改 `app.py` 中的端口号
 3. **权限问题**：确保对当前目录有读写权限
-4. **数据库损坏**：删除 `data.sqlite3` 重新生成
+4. **数据库损坏**：删除 DB_PATH 指向的数据库文件后重新生成（容器默认 `/app/data/data.sqlite3`；本地示例 `./data.sqlite3`）
 
 ### 重置系统
-如需重置所有数据，删除 `data.sqlite3` 文件后重启应用即可。
+如需重置所有数据，删除 DB_PATH 指向的数据库文件后重启应用即可（容器默认 `/app/data/data.sqlite3`；本地示例 `./data.sqlite3`）。
+
+## 配置说明
+
+- DB_PATH: 指定 SQLite 数据库文件路径
+  - 容器/Compose 默认：`/app/data/data.sqlite3`
+  - 本地运行示例：`DB_PATH=./data.sqlite3 python app.py`
+  - 未设置时使用默认值；应用会在首次访问时自动创建目录与数据库文件
 
 ## 📝 更新日志
 
@@ -252,10 +261,3 @@ app.run(host='0.0.0.0', port=3501, debug=True)
 - ✅ 简化的用户界面
 - ✅ 增强的颜色主题系统
 
-## 📄 许可证
-
-本项目采用 MIT 许可证，可自由使用和修改。
-
----
-
-**提示**: 这是一个完全本地的应用，您的所有数据都存储在本地，不会上传到任何云端服务器。

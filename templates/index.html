@@ -29,19 +29,84 @@
     </div>
   </section>
 
+  <!-- 桌面端覆盖式侧边栏 + 固定开关按钮（不挤压内容） - 始终渲染，便于空结果时也能操作筛选 -->
+  <button id="sidebarToggle" class="icon-btn small drawer-toggle" title="展开/收起筛选" aria-label="展开/收起筛选">
+    <i class="fas fa-angle-right"></i>
+  </button>
+  <aside id="sidebarPanel" class="drawer" data-open="false" aria-hidden="true" aria-label="筛选侧边栏">
+    <div class="drawer-header">
+      <div class="drawer-title">
+        <i class="fas fa-sliders"></i>
+        <span>筛选</span>
+      </div>
+      <button id="drawerCloseBtn" class="icon-btn small drawer-close" title="收起筛选" aria-label="收起筛选" style="display:none">
+        <i class="fas fa-angle-left"></i>
+      </button>
+    </div>
+
+    <div class="drawer-section">
+      <div class="section-title">
+        <i class="fas fa-tags"></i>
+        <span>标签</span>
+        <button class="link-btn reset-btn" data-reset="tags">全部</button>
+      </div>
+      <div class="facet-list">
+        {% if tag_counts and tag_counts|length > 0 %}
+          {% for tag, cnt in tag_counts|dictsort(by='value', reverse=True) %}
+            <label class="facet-item">
+              <input type="checkbox" name="ftag" value="{{ tag }}" {% if tag in selected_tags %}checked{% endif %}>
+              <span class="facet-label" title="{{ tag }}">{{ tag }}</span>
+              <span class="facet-count">{{ cnt }}</span>
+            </label>
+          {% endfor %}
+        {% else %}
+          <div class="facet-empty">暂无标签</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <div class="section-title">
+        <i class="fas fa-database"></i>
+        <span>来源</span>
+        <button class="link-btn reset-btn" data-reset="sources">全部</button>
+      </div>
+      <div class="facet-list">
+        {% if source_counts and source_counts|length > 0 %}
+          {% for src, cnt in source_counts|dictsort(by='value', reverse=True) %}
+            <label class="facet-item">
+              <input type="checkbox" name="fsrc" value="{{ src }}" {% if src in selected_sources %}checked{% endif %}>
+              <span class="facet-label" title="{{ '未设置' if src=='(empty)' else src }}">{{ '未设置' if src=='(empty)' else src }}</span>
+              <span class="facet-count">{{ cnt }}</span>
+            </label>
+          {% endfor %}
+        {% else %}
+          <div class="facet-empty">暂无来源</div>
+        {% endif %}
+      </div>
+    </div>
+  </aside>
+
   <div class="content-section">
     {% if prompts|length == 0 %}
+      {% set has_filters = (q and q|length > 0) or (selected_tags and selected_tags|length > 0) or (selected_sources and selected_sources|length > 0) %}
       <div class="empty-state">
         <div class="empty-icon">
           <i class="fas fa-inbox"></i>
         </div>
-        <h3 class="empty-title">暂无提示词</h3>
-        <p class="empty-description">
-          点击"新建提示词"开始创建您的第一个提示词
-        </p>
-        <a href="{{ url_for('new_prompt') }}" class="btn primary">
-          <i class="fas fa-plus"></i> 创建第一个提示词
-        </a>
+        {% if has_filters %}
+          <h3 class="empty-title">没有符合筛选条件的结果</h3>
+          <p class="empty-description">调整或清空筛选条件后再试试</p>
+          <button class="btn" id="clearFiltersBtn" type="button">
+            <i class="fas fa-eraser"></i> 清空筛选条件
+          </button>
+        {% else %}
+          <h3 class="empty-title">暂无提示词</h3>
+          <p class="empty-description">点击"新建提示词"开始创建您的第一个提示词</p>
+          <a href="{{ url_for('new_prompt') }}" class="btn primary">
+            <i class="fas fa-plus"></i> 创建第一个提示词
+          </a>
+        {% endif %}
       </div>
     {% else %}
       <div class="stats-bar">
@@ -70,8 +135,8 @@
       </div>
 
       <div id="promptList" class="list grid-view">
-        {% for p in prompts %}
-          <article class="card" style="animation-delay: {{ loop.index * 0.1 }}s;">
+      {% for p in prompts %}
+        <article class="card" style="animation-delay: {{ loop.index * 0.1 }}s;">
             <div class="card-header">
               <div class="card-title-area">
                 <a href="{{ url_for('prompt_detail', prompt_id=p['id']) }}" class="card-title">
@@ -146,9 +211,9 @@
                 </div>
               </div>
             {% endif %}
-          </article>
-        {% endfor %}
-      </div>
+            </article>
+          {% endfor %}
+          </div>
     {% endif %}
   </div>
 
@@ -182,6 +247,71 @@
       border-color: var(--fg);
     }
 
+    /* 桌面端抽屉式侧边栏（覆盖不挤压内容） */
+    @media (min-width: 769px) {
+      :root { --drawer-w: 280px; --drawer-top: 72px; }
+      .drawer {
+        position: fixed;
+        top: var(--drawer-top);
+        left: 0;
+        width: var(--drawer-w);
+        height: calc(100vh - var(--drawer-top));
+        background: var(--card);
+        border-right: 1px solid var(--border);
+        box-shadow: 0 10px 30px var(--shadow);
+        border-top-right-radius: var(--radius-xl);
+        border-bottom-right-radius: var(--radius-xl);
+        transform: translateX(-100%);
+        transition: transform .25s ease;
+        overflow: auto;
+        z-index: 900;
+        padding: var(--spacing-md);
+      }
+      .drawer[data-open="true"] { transform: translateX(0); }
+
+      .drawer-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--spacing-sm); }
+      .drawer-title { display: inline-flex; gap: 8px; align-items: center; color: var(--muted); font-weight: 600; }
+      .drawer-close { border: none; background: transparent; color: var(--muted); transition: color .2s ease, transform .2s ease; }
+      .drawer-close:hover { color: var(--primary); transform: scale(1.05); }
+      .drawer-section { border-top: 1px dashed var(--border); padding-top: var(--spacing-md); margin-top: var(--spacing-md); }
+
+      .drawer .section-title { display: flex; align-items: center; justify-content: space-between; font-size: var(--font-size-sm); margin-bottom: var(--spacing-sm); color: var(--muted); gap: var(--spacing-sm); }
+
+      .drawer .facet-list { display: grid; gap: 6px; padding-right: 4px; }
+      .drawer .facet-item { display: grid; grid-template-columns: 20px 1fr auto; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--radius-md); cursor: pointer; }
+      .drawer .facet-item:hover { background: color-mix(in srgb, var(--primary) 6%, transparent); }
+      .drawer .facet-count { font-size: 12px; color: var(--muted); border: 1px solid var(--border); padding: 0 8px; border-radius: 999px; min-width: 28px; text-align: center; }
+
+      .drawer-toggle {
+        position: fixed;
+        top: calc(var(--drawer-top) + 10px);
+        left: 0;
+        z-index: 950;
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--card) 85%, transparent);
+        color: var(--fg);
+        border: none;
+        outline: none;
+        backdrop-filter: blur(8px);
+        box-shadow: 0 6px 16px var(--shadow);
+        transition: transform .2s ease, background .2s ease, box-shadow .2s ease;
+      }
+      .drawer-toggle:hover { background: color-mix(in srgb, var(--primary) 12%, var(--card)); }
+      .drawer-toggle:focus { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent), 0 6px 16px var(--shadow); }
+      .drawer-toggle:active { transform: scale(0.95); }
+      .drawer-toggle i { transition: transform .2s ease; }
+      .drawer-toggle[data-open="true"] { background: color-mix(in srgb, var(--primary) 8%, var(--card)); }
+      .drawer-toggle.clicked { animation: pop .18s ease; }
+      @keyframes pop { 0% { transform: scale(0.96); } 100% { transform: scale(1); } }
+    }
+
+    @media (max-width: 768px) {
+      /* 移动端隐藏抽屉和开关 */
+      .drawer, .drawer-toggle { display: none !important; }
+    }
+
     /* 网格视图（桌面端） */
     #promptList.grid-view {
       display: grid;
@@ -198,6 +328,127 @@
     @media (max-width: 768px) {
       .view-toggle { display: none; }
       #promptList { grid-template-columns: 1fr !important; }
+    }
+
+    .home-layout {
+      /* 全宽铺满，让侧边栏贴齐屏幕最左侧 */
+      width: 100vw;
+      margin-left: calc(50% - 50vw);
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: var(--spacing-xl);
+      align-items: start;
+    }
+    .sidebar {
+      position: sticky;
+      top: 76px; /* 顶部栏高度 + 间距 */
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: var(--spacing-md);
+      min-height: 200px;
+      transition: width 0.2s ease, padding 0.2s ease;
+      width: 100%;
+      overflow: hidden;
+    }
+    .sidebar-header { position: relative; min-height: 44px; }
+    .sidebar #sidebarToggle {
+      position: absolute;
+      top: 8px;
+      left: 8px; /* 按钮位于侧边栏内部左上角 */
+      z-index: 2;
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+    }
+    .sidebar[data-collapsed="true"] {
+      width: 56px; /* 折叠为窄栏，仅显示按钮 */
+      padding: var(--spacing-sm);
+    }
+    /* 折叠时隐藏内容区与标题，仅保留按钮 */
+    .sidebar[data-collapsed="true"] .sidebar-section { display: none; }
+    .sidebar[data-collapsed="true"] .sidebar-title { display: none; }
+
+    /* 侧边栏收起时，主区域占满 */
+    #homeLayout[data-sidebar-collapsed="true"] {
+      grid-template-columns: 56px 1fr;
+    }
+    .sidebar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 8px 4px 48px; /* 为左上角按钮预留空间 */
+      margin-bottom: var(--spacing-sm);
+    }
+    .sidebar-title {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .sidebar-section { 
+      border-top: 1px dashed var(--border);
+      padding-top: var(--spacing-md);
+      margin-top: var(--spacing-md);
+    }
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: var(--font-size-sm);
+      margin-bottom: var(--spacing-sm);
+      color: var(--muted);
+      gap: var(--spacing-sm);
+    }
+    .section-title i { opacity: .8; }
+    .link-btn {
+      background: transparent;
+      border: none;
+      color: var(--primary);
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: var(--radius-md);
+    }
+    .link-btn:hover {
+      background: color-mix(in srgb, var(--primary) 10%, transparent);
+    }
+    .facet-list {
+      display: grid;
+      gap: 6px;
+      max-height: 360px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+    .facet-item {
+      display: grid;
+      grid-template-columns: 20px 1fr auto;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: var(--radius-md);
+      transition: background 0.2s ease;
+      cursor: pointer;
+    }
+    .facet-item:hover { background: color-mix(in srgb, var(--primary) 6%, transparent); }
+    .facet-item input { margin: 0; }
+    .facet-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .facet-count {
+      font-size: 12px;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 0 8px;
+      border-radius: 999px;
+      min-width: 28px;
+      text-align: center;
+    }
+    .facet-empty { color: var(--muted); font-size: var(--font-size-sm); padding: 6px 8px; }
+
+    .main { 
+      width: 100%; 
+      max-width: 1200px; 
+      padding: 0 var(--spacing-xl);
+      margin: 0 auto;
     }
 
     .toolbar {
@@ -581,6 +832,11 @@
     }
     
     @media (max-width: 768px) {
+      .home-layout {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-lg);
+      }
+      .sidebar { display: none; }
       .toolbar {
         padding: var(--spacing-lg);
         margin-bottom: var(--spacing-xl);
@@ -688,6 +944,101 @@
   </style>
   
   <script>
+    // 抽屉侧边栏：仅桌面端显示，覆盖式，不挤压内容
+    (function() {
+      const panel = document.getElementById('sidebarPanel');
+      const toggle = document.getElementById('sidebarToggle');
+      const closeBtn = document.getElementById('drawerCloseBtn');
+      if (!panel || !toggle) return;
+
+      const SBW = 280; // 与 --drawer-w 同步
+      const key = 'sidebarOpen';
+      const saved = localStorage.getItem(key);
+      if (saved === 'true') {
+        panel.dataset.open = 'true';
+        panel.setAttribute('aria-hidden', 'false');
+        toggle.style.left = '0px';
+        toggle.style.display = 'none';
+        toggle.innerHTML = '<i class="fas fa-angle-left"></i>';
+        toggle.setAttribute('data-open', 'true');
+        if (closeBtn) closeBtn.style.display = 'inline-flex';
+      }
+
+      function setOpen(open) {
+        panel.dataset.open = open ? 'true' : 'false';
+        panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+        localStorage.setItem(key, String(open));
+        toggle.style.left = '0px';
+        toggle.innerHTML = open ? '<i class="fas fa-angle-left"></i>' : '<i class="fas fa-angle-right"></i>';
+        toggle.setAttribute('data-open', open ? 'true' : 'false');
+        // 打开时隐藏外侧按钮，显示抽屉内关闭按钮；收起相反
+        toggle.style.display = open ? 'none' : 'inline-flex';
+        if (closeBtn) closeBtn.style.display = open ? 'inline-flex' : 'none';
+        toggle.classList.remove('clicked');
+        // 触发轻微弹跳动画
+        requestAnimationFrame(() => {
+          toggle.classList.add('clicked');
+          setTimeout(() => toggle.classList.remove('clicked'), 200);
+        });
+      }
+
+      toggle.addEventListener('click', () => {
+        const isOpen = panel.dataset.open === 'true';
+        setOpen(!isOpen);
+      });
+      if (closeBtn) {
+        closeBtn.addEventListener('click', () => setOpen(false));
+      }
+
+      // 点击抽屉外部区域关闭（可选：目前不加遮罩，保持轻量）
+    })();
+
+      // 构建查询并跳转
+      function applyFilters() {
+        const params = new URLSearchParams(window.location.search);
+        // 保留 q/sort
+        const keep = { q: params.get('q') || '', sort: params.get('sort') || '' };
+        params.forEach((_, k) => { if (!['q','sort'].includes(k)) params.delete(k); });
+
+        // tags
+        const tags = Array.from(document.querySelectorAll('input[name="ftag"]:checked')).map(i => i.value);
+        tags.forEach(t => params.append('tag', t));
+        // sources
+        const srcs = Array.from(document.querySelectorAll('input[name="fsrc"]:checked')).map(i => i.value);
+        srcs.forEach(s => params.append('source', s));
+
+        if (keep.q) params.set('q', keep.q);
+        if (keep.sort) params.set('sort', keep.sort);
+        const url = `${window.location.pathname}?${params.toString()}`;
+        window.location.assign(url);
+      }
+
+      // 绑定复选框事件
+      document.querySelectorAll('input[name="ftag"], input[name="fsrc"]').forEach(el => {
+        el.addEventListener('change', applyFilters);
+      });
+      // 重置按钮
+      document.querySelectorAll('.reset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const type = btn.dataset.reset;
+          if (type === 'tags') {
+            document.querySelectorAll('input[name="ftag"]').forEach(i => i.checked = false);
+          } else if (type === 'sources') {
+            document.querySelectorAll('input[name="fsrc"]').forEach(i => i.checked = false);
+          }
+          applyFilters();
+        });
+      });
+
+      // 清空筛选按钮（空结果时显示）
+      const clearBtn = document.getElementById('clearFiltersBtn');
+      if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+          document.querySelectorAll('input[name="ftag"], input[name="fsrc"]').forEach(i => i.checked = false);
+          applyFilters();
+        });
+      }
+
     // 视图切换：在桌面端于列表上方显示，按钮图标在网格/列表间切换
     (function() {
       const listEl = document.getElementById('promptList');

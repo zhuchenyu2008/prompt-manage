@@ -1,22 +1,74 @@
 // Enhanced UI interactions and animations
+// Theme manager: follow system by default, allow manual override
+(function(){
+  const KEY = 'theme'; // 'light' | 'dark' | null (auto)
+  const mql = window.matchMedia('(prefers-color-scheme: dark)');
+
+  function getManual() {
+    try { return localStorage.getItem(KEY); } catch (_) { return null; }
+  }
+  function setManual(val) {
+    try {
+      if (val === 'light' || val === 'dark') localStorage.setItem(KEY, val);
+      else localStorage.removeItem(KEY);
+    } catch (_) {}
+  }
+  function effectiveTheme() {
+    const manual = getManual();
+    if (manual === 'light' || manual === 'dark') return manual;
+    return mql.matches ? 'dark' : 'light';
+  }
+  function applyTheme(manual) {
+    const mode = (manual === 'light' || manual === 'dark') ? manual : null;
+    if (mode) document.documentElement.setAttribute('data-theme', mode);
+    else document.documentElement.removeAttribute('data-theme');
+    syncThemeColor(mode ? mode : effectiveTheme(), !!mode);
+  }
+  function syncThemeColor(mode, isManual) {
+    // If manual override, inject a dynamic meta to override media-based ones
+    let meta = document.querySelector('meta[name="theme-color"]#dynamic-theme');
+    if (isManual) {
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.name = 'theme-color';
+        meta.id = 'dynamic-theme';
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute('content', mode === 'dark' ? '#0b0b0f' : '#ffffff');
+    } else {
+      if (meta) meta.remove();
+    }
+  }
+
+  // Init on load (honors inline head script state)
+  applyTheme(getManual());
+  // Follow system when in auto
+  mql.addEventListener('change', () => {
+    if (!getManual()) applyTheme(null);
+  });
+
+  // Expose global setter for optional UI
+  window.setTheme = function(t) {
+    if (t === 'light' || t === 'dark') { setManual(t); applyTheme(t); }
+    else { setManual(null); applyTheme(null); }
+  };
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
-  // Theme toggle with smooth transition
+  // Theme toggle with smooth transition (two states: light/dark)
   const btn = document.getElementById('themeToggle');
   if (btn) {
     btn.addEventListener('click', () => {
-      const cur = document.documentElement.getAttribute('data-theme') || 'light';
-      const next = cur === 'dark' ? 'light' : 'dark';
-      
-      // Add transition effect
-      document.documentElement.style.transition = 'background-color 0.3s ease, color 0.3s ease';
-      document.documentElement.setAttribute('data-theme', next);
-      localStorage.setItem('theme', next);
-      
-      // Add a pulse animation to the button
-      btn.style.animation = 'pulse 0.3s ease';
-      setTimeout(() => {
-        btn.style.animation = '';
-      }, 300);
+      const saved = (function(){ try { return localStorage.getItem('theme'); } catch(_) { return null; } })();
+      let next;
+      if (saved === 'light') next = 'dark';
+      else if (saved === 'dark') next = 'light';
+      else {
+        // In auto mode: toggle from current effective theme
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        next = prefersDark ? 'light' : 'dark';
+      }
+      window.setTheme(next);
     });
   }
 
@@ -341,4 +393,3 @@ const utils = {
 
 // Export utils for global use
 window.utils = utils;
-

@@ -1,14 +1,37 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark">
+  <!-- Mobile status bar colors for auto mode (follow OS) -->
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b0b0f" media="(prefers-color-scheme: dark)">
   <title>{% block title %}Prompt 管理器{% endblock %}</title>
+  <script>
+    // Apply saved manual theme ASAP to avoid flash; otherwise follow system
+    (function() {
+      try {
+        var saved = localStorage.getItem('theme'); // 'light' | 'dark' | null(自动)
+        if (saved === 'light' || saved === 'dark') {
+          document.documentElement.setAttribute('data-theme', saved);
+          window.__THEME__ = saved;
+        } else {
+          // 自动模式：不设置 data-theme，由 CSS + prefers-color-scheme 控制
+          document.documentElement.removeAttribute('data-theme');
+          window.__THEME__ = 'auto';
+        }
+      } catch (e) {
+        // Fallback to auto if localStorage unavailable
+        document.documentElement.removeAttribute('data-theme');
+        window.__THEME__ = 'auto';
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-  <script>window.__THEME__ = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark':'light'); document.documentElement.setAttribute('data-theme', window.__THEME__);</script>
 </head>
 <body>
   <header class="topbar">
@@ -41,4 +64,3 @@
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
-
