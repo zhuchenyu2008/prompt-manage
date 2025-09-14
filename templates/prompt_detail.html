@@ -110,6 +110,24 @@
                        placeholder="补充说明或使用注意事项" />
                   </div>
             </div>
+
+            <div class="form-group" style="margin-top: var(--spacing-md);">
+              <label class="checkbox-label">
+                <input type="checkbox" name="require_password" value="1"
+                       {% if prompt and prompt['require_password'] %}checked{% endif %}
+                       {% if auth_mode != 'per' %}disabled{% endif %} />
+                <span class="checkbox-custom"></span>
+                <span class="checkbox-text">
+                  <i class="fas fa-lock"></i>
+                  该提示词需要密码访问
+                </span>
+              </label>
+              {% if auth_mode == 'global' %}
+                <div class="input-help">已开启全局密码，单个提示词的密码设置不再生效。</div>
+              {% elif auth_mode == 'off' %}
+                <div class="input-help">当前未启用“指定提示词密码”模式，本项暂不生效。</div>
+              {% endif %}
+            </div>
           </div>
         </div>
       </div>

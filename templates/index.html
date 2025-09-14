@@ -136,10 +136,11 @@
 
       <div id="promptList" class="list grid-view">
       {% for p in prompts %}
+        {% set is_locked = (auth_mode == 'per') and (p['id'] in locked_ids) %}
         <article class="card" style="animation-delay: {{ loop.index * 0.1 }}s;">
             <div class="card-header">
               <div class="card-title-area">
-                <a href="{{ url_for('prompt_detail', prompt_id=p['id']) }}" class="card-title">
+                <a href="{{ url_for('unlock_prompt', prompt_id=p['id']) if is_locked else url_for('prompt_detail', prompt_id=p['id']) }}" class="card-title">
                   <i class="fas fa-file-alt"></i>
                   <span class="title-text">{{ p['name'] }}</span>
                 </a>
@@ -157,26 +158,40 @@
               </div>
               
               <div class="card-meta">
-                <div class="meta-item">
-                  <i class="fas fa-link"></i>
-                  <span class="meta-label">来源：</span>
-                  <span class="meta-value">{{ p['source'] or '—' }}</span>
-                </div>
-                <div class="meta-item">
-                  <i class="fas fa-clock"></i>
-                  <span class="meta-label">修改：</span>
-                  <span class="meta-value">{{ (p['updated_at'] or '')[:19].replace('T',' ') }}</span>
-                </div>
-                <div class="meta-item">
-                  <i class="fas fa-code-branch"></i>
-                  <span class="meta-label">版本：</span>
-                  <span class="meta-value">{{ p['current_version'] or '—' }}</span>
-                </div>
+                {% if is_locked %}
+                  <div class="meta-item">
+                    <i class="fas fa-link"></i>
+                    <span class="meta-label">来源：</span>
+                    <span class="meta-value">需要密码</span>
+                  </div>
+                {% else %}
+                  <div class="meta-item">
+                    <i class="fas fa-link"></i>
+                    <span class="meta-label">来源：</span>
+                    <span class="meta-value">{{ p['source'] or '—' }}</span>
+                  </div>
+                  <div class="meta-item">
+                    <i class="fas fa-clock"></i>
+                    <span class="meta-label">修改：</span>
+                    <span class="meta-value">{{ (p['updated_at'] or '')[:19].replace('T',' ') }}</span>
+                  </div>
+                  <div class="meta-item">
+                    <i class="fas fa-code-branch"></i>
+                    <span class="meta-label">版本：</span>
+                    <span class="meta-value">{{ p['current_version'] or '—' }}</span>
+                  </div>
+                {% endif %}
               </div>
+              {% if is_locked %}
+              <div class="meta-item" style="margin-top: var(--spacing-sm); color: var(--muted);">
+                <i class="fas fa-lock"></i>
+                <span class="meta-label">该提示词受密码保护</span>
+              </div>
+              {% endif %}
             </div>
 
             {% set tags = (p['tags'] and (p['tags']|loads)) or [] %}
-            {% if tags %}
+            {% if not is_locked and tags %}
               <div class="card-tags">
                 {% for t in tags %}
                   <span class="tag">
@@ -187,14 +202,14 @@
               </div>
             {% endif %}
 
-            {% if p['notes'] %}
+            {% if p['notes'] and not is_locked %}
               <div class="card-notes">
                 <i class="fas fa-sticky-note"></i>
                 <span class="notes-text">{{ p['notes'] }}</span>
               </div>
             {% endif %}
 
-            {% if p['current_content'] %}
+            {% if p['current_content'] and not is_locked %}
               <div class="card-preview">
                 <div class="preview-header">
                   <div class="preview-title">
@@ -206,8 +221,7 @@
                   </button>
                 </div>
                 <div class="preview-content">
-                  {{ p['current_content'][:150] }}
-                  {% if p['current_content']|length > 150 %}...{% endif %}
+                  {{ p['current_content'][:150] }}{% if p['current_content']|length > 150 %}...{% endif %}
                 </div>
               </div>
             {% endif %}

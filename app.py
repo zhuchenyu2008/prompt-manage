@@ -2,7 +2,7 @@ import json
 import os
 import sqlite3
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, send_file, jsonify, session
 from werkzeug.utils import secure_filename
 from io import BytesIO
 
@@ -31,7 +31,8 @@ def init_db():
             pinned INTEGER DEFAULT 0,
             created_at TEXT,
             updated_at TEXT,
-            current_version_id INTEGER
+            current_version_id INTEGER,
+            require_password INTEGER DEFAULT 0
         )
         """
     )
@@ -58,6 +59,9 @@ def init_db():
     )
     # 默认阈值 200
     cur.execute("INSERT OR IGNORE INTO settings(key, value) VALUES('version_cleanup_threshold', '200')")
+    # 简易认证默认设置
+    cur.execute("INSERT OR IGNORE INTO settings(key, value) VALUES('auth_mode', 'off')")
+    cur.execute("INSERT OR IGNORE INTO settings(key, value) VALUES('auth_password_hash', '')")
     conn.commit()
     conn.close()
 
@@ -159,6 +163,32 @@ def ensure_db():
         pass
     if not os.path.exists(DB_PATH):
         init_db()
+    else:
+        # best-effort migrations for new versions
+        migrate_schema()
+
+
+def migrate_schema():
+    """Run lightweight schema migrations to add new columns/settings if missing."""
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        # ensure prompts.require_password exists
+        cols = [r['name'] for r in cur.execute('PRAGMA table_info(prompts)').fetchall()]
+        if 'require_password' not in cols:
+            cur.execute("ALTER TABLE prompts ADD COLUMN require_password INTEGER DEFAULT 0")
+        # ensure auth settings keys exist
+        cur.execute("INSERT OR IGNORE INTO settings(key, value) VALUES('auth_mode', 'off')")
+        cur.execute("INSERT OR IGNORE INTO settings(key, value) VALUES('auth_password_hash', '')")
+        conn.commit()
+    except Exception:
+        # ignore migration failures to avoid blocking the app
+        pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 app = Flask(__name__)
@@ -170,11 +200,25 @@ app.jinja_env.filters['loads'] = json.loads
 @app.before_request
 def _before():
     ensure_db()
+    # 全局密码模式拦截：除登录与静态资源外均需认证
+    try:
+        conn = get_db()
+        mode = get_setting(conn, 'auth_mode', 'off') or 'off'
+        conn.close()
+    except Exception:
+        mode = 'off'
+    if mode == 'global':
+        # Allow login and static assets without auth
+        allowed = (request.endpoint in {'login', 'static'}) or request.path.startswith('/static/')
+        if not allowed and not session.get('auth_ok'):
+            nxt = request.url
+            return redirect(url_for('login', next=nxt))
 
 
 @app.route('/')
 def index():
     conn = get_db()
+    auth_mode = get_setting(conn, 'auth_mode', 'off') or 'off'
     q = request.args.get('q', '').strip()
     sort = request.args.get('sort', 'updated')  # updated|created|name|tags
     # 多选筛选：支持 ?tag=a&tag=b 与 ?tags=a,b，两者合并
@@ -207,6 +251,16 @@ def index():
         params.extend([like, like, like, like, like])
     sql += f" ORDER BY {order_clause}"
     prompts = conn.execute(sql, params).fetchall()
+    # 需要密码且未解锁的提示词（仅在“指定提示词密码”模式下生效）
+    unlocked = set(session.get('unlocked_prompts') or [])
+    locked_ids = set()
+    if auth_mode == 'per':
+        for r in prompts:
+            try:
+                if r['require_password'] and (r['id'] not in unlocked):
+                    locked_ids.add(r['id'])
+            except Exception:
+                pass
 
     # 在当前搜索范围内统计标签与来源计数（便于侧边栏显示）
     tag_counts = {}
@@ -215,6 +269,9 @@ def index():
         return (s or '').strip() or '(empty)'
     for r in prompts:
         # tags 存储为 JSON 文本
+        if auth_mode == 'per' and r['id'] in locked_ids:
+            # 锁定项不参与侧边栏统计
+            continue
         try:
             arr = json.loads(r['tags']) if r['tags'] else []
         except Exception:
@@ -231,6 +288,9 @@ def index():
             row_tags = json.loads(row['tags']) if row['tags'] else []
         except Exception:
             row_tags = []
+        # 锁定项在应用筛选时不参与匹配
+        if (selected_tags or selected_sources) and (auth_mode == 'per') and (row['id'] in locked_ids):
+            return False
         ok_tag = True
         if selected_tags:
             ok_tag = any(t in row_tags for t in selected_tags)
@@ -242,8 +302,19 @@ def index():
     if selected_tags or selected_sources:
         prompts = [r for r in prompts if include_row(r)]
 
-    # 标签汇总用于输入联想
-    tag_suggestions = get_all_tags(conn)
+    # 标签汇总用于输入联想（排除未解锁的受保护提示词）
+    tag_suggestions = []
+    all_rows = conn.execute("SELECT id, tags, require_password FROM prompts").fetchall()
+    for r in all_rows:
+        if auth_mode == 'per' and r['require_password'] and (r['id'] not in unlocked):
+            continue
+        try:
+            arr = json.loads(r['tags']) if r['tags'] else []
+            for t in arr:
+                if t not in tag_suggestions:
+                    tag_suggestions.append(t)
+        except Exception:
+            pass
     conn.close()
     return render_template(
         'index.html',
@@ -255,6 +326,8 @@ def index():
         source_counts=source_counts,
         selected_tags=selected_tags,
         selected_sources=selected_sources,
+        auth_mode=auth_mode,
+        locked_ids=list(locked_ids),
     )
 
 
@@ -267,13 +340,14 @@ def new_prompt():
         tags = parse_tags(request.form.get('tags', ''))
         content = request.form.get('content', '')
         bump_kind = request.form.get('bump_kind', 'patch')
+        require_password = 1 if request.form.get('require_password') == '1' else 0
 
         conn = get_db()
         cur = conn.cursor()
         ts = now_ts()
         cur.execute(
-            "INSERT INTO prompts(name, source, notes, tags, pinned, created_at, updated_at) VALUES(?,?,?,?,0,?,?)",
-            (name, source, notes, json.dumps(tags, ensure_ascii=False), ts, ts)
+            "INSERT INTO prompts(name, source, notes, tags, pinned, created_at, updated_at, require_password) VALUES(?,?,?,?,0,?,?,?)",
+            (name, source, notes, json.dumps(tags, ensure_ascii=False), ts, ts, require_password)
         )
         pid = cur.lastrowid
         version = bump_version(None, bump_kind)
@@ -288,12 +362,17 @@ def new_prompt():
         conn.close()
         flash('已创建提示词并保存首个版本', 'success')
         return redirect(url_for('prompt_detail', prompt_id=pid))
-    return render_template('prompt_detail.html', prompt=None, versions=[], current=None)
+    # 读取认证模式控制复选框可用性
+    conn = get_db()
+    auth_mode = get_setting(conn, 'auth_mode', 'off') or 'off'
+    conn.close()
+    return render_template('prompt_detail.html', prompt=None, versions=[], current=None, auth_mode=auth_mode)
 
 
 @app.route('/prompt/<int:prompt_id>', methods=['GET', 'POST'])
 def prompt_detail(prompt_id):
     conn = get_db()
+    auth_mode = get_setting(conn, 'auth_mode', 'off') or 'off'
     if request.method == 'POST':
         # 保存新版本或仅更新元信息
         name = request.form.get('name', '').strip() or '未命名提示词'
@@ -303,10 +382,11 @@ def prompt_detail(prompt_id):
         content = request.form.get('content', '')
         bump_kind = request.form.get('bump_kind', 'patch')
         do_save_version = request.form.get('do_save_version') == '1'
+        require_password = 1 if request.form.get('require_password') == '1' else 0
         ts = now_ts()
 
-        conn.execute("UPDATE prompts SET name=?, source=?, notes=?, tags=?, updated_at=? WHERE id=?",
-                     (name, source, notes, json.dumps(tags, ensure_ascii=False), ts, prompt_id))
+        conn.execute("UPDATE prompts SET name=?, source=?, notes=?, tags=?, updated_at=?, require_password=? WHERE id=?",
+                     (name, source, notes, json.dumps(tags, ensure_ascii=False), ts, require_password, prompt_id))
 
         if do_save_version:
             # 取当前版本号
@@ -339,10 +419,16 @@ def prompt_detail(prompt_id):
         conn.close()
         flash('未找到该提示词', 'error')
         return redirect(url_for('index'))
+    # 指定提示词密码模式：未解锁则跳转解锁页
+    if auth_mode == 'per' and prompt['require_password']:
+        unlocked = set(session.get('unlocked_prompts') or [])
+        if prompt['id'] not in unlocked:
+            conn.close()
+            return redirect(url_for('unlock_prompt', prompt_id=prompt_id, next=url_for('prompt_detail', prompt_id=prompt_id)))
     versions = conn.execute("SELECT * FROM versions WHERE prompt_id=? ORDER BY created_at DESC", (prompt_id,)).fetchall()
     current = conn.execute("SELECT * FROM versions WHERE id=?", (prompt['current_version_id'],)).fetchone() if prompt['current_version_id'] else None
     conn.close()
-    return render_template('prompt_detail.html', prompt=prompt, versions=versions, current=current)
+    return render_template('prompt_detail.html', prompt=prompt, versions=versions, current=current, auth_mode=auth_mode)
 
 
 @app.route('/prompt/<int:prompt_id>/pin', methods=['POST'])
@@ -417,6 +503,30 @@ def settings():
             set_setting(conn, 'version_cleanup_threshold', threshold)
             conn.commit()
             flash('设置已保存', 'success')
+        # 访问密码：模式 + 修改密码
+        mode = request.form.get('auth_mode', 'off')
+        if mode not in ('off', 'per', 'global'):
+            mode = 'off'
+        new_pw = (request.form.get('new_password') or '').strip()
+        confirm_pw = (request.form.get('confirm_password') or '').strip()
+        saved_hash = get_setting(conn, 'auth_password_hash', '') or ''
+        prev_mode = get_setting(conn, 'auth_mode', 'off') or 'off'
+        mode_to_set = mode
+        if mode != 'off':
+            if not saved_hash and not new_pw:
+                flash('请先设置访问密码（4-8 位）', 'error')
+                mode_to_set = prev_mode  # 保持原状
+            if new_pw:
+                if new_pw != confirm_pw:
+                    flash('两次输入的密码不一致', 'error')
+                    mode_to_set = prev_mode
+                elif not (4 <= len(new_pw) <= 8):
+                    flash('密码长度需为 4-8 位', 'error')
+                    mode_to_set = prev_mode
+                else:
+                    set_setting(conn, 'auth_password_hash', hash_pw(new_pw))
+        set_setting(conn, 'auth_mode', mode_to_set)
+        conn.commit()
         # 导入
         if 'import_file' in request.files and request.files['import_file']:
             f = request.files['import_file']
@@ -432,7 +542,7 @@ def settings():
                 prompts = data
             for p in prompts:
                 cur.execute(
-                    "INSERT INTO prompts(id, name, source, notes, tags, pinned, created_at, updated_at, current_version_id) VALUES(?,?,?,?,?,?,?,?,NULL)",
+                    "INSERT INTO prompts(id, name, source, notes, tags, pinned, created_at, updated_at, current_version_id, require_password) VALUES(?,?,?,?,?,?,?,?,NULL,?)",
                     (
                         p.get('id'),
                         p.get('name'),
@@ -442,6 +552,7 @@ def settings():
                         1 if p.get('pinned') else 0,
                         p.get('created_at') or now_ts(),
                         p.get('updated_at') or now_ts(),
+                        1 if p.get('require_password') else 0,
                     )
                 )
                 pid = cur.lastrowid if p.get('id') is None else p.get('id')
@@ -464,8 +575,9 @@ def settings():
         return redirect(url_for('settings'))
 
     threshold = get_setting(conn, 'version_cleanup_threshold', '200')
+    auth_mode = get_setting(conn, 'auth_mode', 'off') or 'off'
     conn.close()
-    return render_template('settings.html', threshold=threshold)
+    return render_template('settings.html', threshold=threshold, auth_mode=auth_mode)
 
 
 @app.route('/export')
@@ -482,6 +594,7 @@ def export_all():
             'notes': p['notes'],
             'tags': json.loads(p['tags']) if p['tags'] else [],
             'pinned': bool(p['pinned']),
+            'require_password': bool(p['require_password']) if 'require_password' in p.keys() else False,
             'created_at': p['created_at'],
             'updated_at': p['updated_at'],
             'current_version_id': p['current_version_id'],
@@ -592,6 +705,11 @@ def diff_view(prompt_id):
     mode = request.args.get('mode', 'word')  # word|line
     conn = get_db()
     prompt = conn.execute("SELECT * FROM prompts WHERE id=?", (prompt_id,)).fetchone()
+    # 未解锁受保护提示词则跳转解锁
+    auth_mode = get_setting(conn, 'auth_mode', 'off') or 'off'
+    if auth_mode == 'per' and prompt and prompt['require_password'] and (prompt_id not in set(session.get('unlocked_prompts') or [])):
+        conn.close()
+        return redirect(url_for('unlock_prompt', prompt_id=prompt_id, next=url_for('diff_view', prompt_id=prompt_id, left=left_id, right=right_id, mode=mode)))
     versions = conn.execute("SELECT * FROM versions WHERE prompt_id=? ORDER BY created_at DESC", (prompt_id,)).fetchall()
     if not versions:
         conn.close()
@@ -635,6 +753,11 @@ def versions_page(prompt_id):
         conn.close()
         flash('未找到该提示词', 'error')
         return redirect(url_for('index'))
+    # 未解锁受保护提示词则跳转解锁
+    auth_mode = get_setting(conn, 'auth_mode', 'off') or 'off'
+    if auth_mode == 'per' and prompt['require_password'] and (prompt_id not in set(session.get('unlocked_prompts') or [])):
+        conn.close()
+        return redirect(url_for('unlock_prompt', prompt_id=prompt_id, next=url_for('versions_page', prompt_id=prompt_id)))
     
     # Convert Row objects to dictionaries for JSON serialization
     versions = conn.execute("SELECT * FROM versions WHERE prompt_id=? ORDER BY created_at DESC", (prompt_id,)).fetchall()
@@ -655,6 +778,70 @@ def api_tags():
     tags = get_all_tags(conn)
     conn.close()
     return jsonify(tags)
+
+
+# === 简易密码认证 ===
+import hashlib
+
+
+def hash_pw(pw: str) -> str:
+    return hashlib.sha256((pw or '').encode('utf-8')).hexdigest()
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    conn = get_db()
+    mode = get_setting(conn, 'auth_mode', 'off') or 'off'
+    saved_hash = get_setting(conn, 'auth_password_hash', '') or ''
+    conn.close()
+    nxt = request.values.get('next') or url_for('index')
+    if request.method == 'POST':
+        password = (request.form.get('password') or '').strip()
+        if not (4 <= len(password) <= 8):
+            flash('密码长度需为 4-8 位', 'error')
+            return render_template('auth.html', mode=mode, action='login', next=nxt)
+        if saved_hash and hash_pw(password) == saved_hash:
+            session['auth_ok'] = True
+            flash('已通过认证', 'success')
+            return redirect(nxt)
+        else:
+            flash('密码不正确', 'error')
+    return render_template('auth.html', mode=mode, action='login', next=nxt)
+
+
+@app.route('/logout')
+def logout():
+    session.pop('auth_ok', None)
+    session.pop('unlocked_prompts', None)
+    flash('已退出登录', 'success')
+    return redirect(url_for('index'))
+
+
+@app.route('/prompt/<int:prompt_id>/unlock', methods=['GET', 'POST'])
+def unlock_prompt(prompt_id):
+    conn = get_db()
+    mode = get_setting(conn, 'auth_mode', 'off') or 'off'
+    saved_hash = get_setting(conn, 'auth_password_hash', '') or ''
+    prompt = conn.execute("SELECT id, name FROM prompts WHERE id=?", (prompt_id,)).fetchone()
+    conn.close()
+    if not prompt:
+        flash('提示词不存在', 'error')
+        return redirect(url_for('index'))
+    nxt = request.values.get('next') or url_for('prompt_detail', prompt_id=prompt_id)
+    if request.method == 'POST':
+        password = (request.form.get('password') or '').strip()
+        if not (4 <= len(password) <= 8):
+            flash('密码长度需为 4-8 位', 'error')
+            return render_template('auth.html', mode=mode, action='unlock', prompt=prompt, next=nxt)
+        if saved_hash and hash_pw(password) == saved_hash:
+            unlocked = set(session.get('unlocked_prompts') or [])
+            unlocked.add(prompt_id)
+            session['unlocked_prompts'] = list(unlocked)
+            flash('已解锁该提示词', 'success')
+            return redirect(nxt)
+        else:
+            flash('密码不正确', 'error')
+    return render_template('auth.html', mode=mode, action='unlock', prompt=prompt, next=nxt)
 
 
 def run():

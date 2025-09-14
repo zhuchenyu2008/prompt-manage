@@ -382,7 +382,7 @@ body {
   z-index: 1;
   font-size: var(--font-size-sm);
 }
-input[type="text"], input[type="number"], select, textarea { 
+input[type="text"], input[type="number"], input[type="password"], select, textarea { 
   width: 100%; 
   padding: var(--spacing-md) var(--spacing-lg); 
   border-radius: var(--radius-lg); 
@@ -396,7 +396,7 @@ input[type="text"], input[type="number"], select, textarea {
   display: flex;
   align-items: center;
 }
-input[type="text"]:focus, input[type="number"]:focus, select:focus, textarea:focus {
+input[type="text"]:focus, input[type="number"]:focus, input[type="password"]:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
@@ -875,7 +875,7 @@ textarea {
   .notes {
     font-size: var(--font-size-xs);
   }
-  input[type="text"], input[type="number"], select, textarea {
+  input[type="text"], input[type="number"], input[type="password"], select, textarea {
     min-height: 44px;
     padding: var(--spacing-sm) var(--spacing-md);
     font-size: var(--font-size-sm);
