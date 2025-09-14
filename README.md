@@ -37,7 +37,14 @@
 ### 📤 数据管理
 - **导入导出**：JSON 格式完整数据备份和恢复
 - **数据安全**：本地 SQLite 存储，无云端依赖
-- **设置管理**：可配置版本清理阈值等系统参数
+- **设置管理**：可配置版本清理阈值与访问密码等系统参数
+
+### 🔒 访问密码（可选）
+- 三选一模式（设置页）：关闭 / 指定提示词密码 / 全局密码
+- 密码要求：4–8 位，首次启用需先设置密码
+- 指定提示词密码：在提示词编辑页勾选“该提示词需要密码访问”
+- 首页行为（指定提示词密码模式）：受保护卡片仅显示标题与“来源：需要密码”，不展示标签、备注与内容预览；点击卡片进入解锁页
+- 会话解锁：本次会话内对已解锁的提示词放行；可通过右上角“退出”清除认证
 
 ## 🚀 快速开始
 
@@ -121,7 +128,7 @@ docker run -d -p 3501:3501 -v prompt-data:/app/data prompt-manager
 1. **克隆或下载项目**
    ```bash
    git clone https://github.com/zhuchenyu2008/prompt-manage
-   cd prompt-manage
+   cd prompt
    ```
 
 2. **安装依赖**
@@ -157,7 +164,8 @@ prompt/
 │   ├── prompt_detail.html # 详情页(编辑页面)
 │   ├── versions.html   # 版本历史页面
 │   ├── diff.html       # 对比页面
-│   └── settings.html   # 设置页面
+│   ├── settings.html   # 设置页面
+│   └── auth.html       # 登录/解锁页面（访问密码）
 ├── static/             # 静态资源
 │   ├── css/
 │   │   └── style.css   # 样式文件
@@ -170,11 +178,15 @@ prompt/
 
 ### 表结构
 - **prompts**: 提示词基本信息
-  - `id`, `name`, `source`, `notes`, `tags`, `pinned`, `created_at`, `updated_at`, `current_version_id`
+  - `id`, `name`, `source`, `notes`, `tags`, `pinned`, `created_at`, `updated_at`, `current_version_id`, `require_password`
 - **versions**: 版本历史记录
   - `id`, `prompt_id`, `version`, `content`, `created_at`, `parent_version_id`
 - **settings**: 系统设置
-  - `key`, `value` (目前仅 `version_cleanup_threshold`)
+  - `key`, `value`
+  - 关键键值：
+    - `version_cleanup_threshold`：版本保留阈值（默认 200）
+    - `auth_mode`：访问密码模式（`off` | `per` | `global`）
+    - `auth_password_hash`：访问密码的 SHA-256 哈希
 
 ### 数据导出示例
 
@@ -188,6 +200,7 @@ prompt/
       "notes": "处理客户咨询的标准回复模板",
       "tags": ["场景/客服", "业务/售后"],
       "pinned": true,
+      "require_password": false,
       "created_at": "2024-01-01T00:00:00",
       "updated_at": "2024-01-02T12:34:56",
       "current_version_id": 3,
@@ -233,6 +246,14 @@ prompt/
 - **批量操作**：通过导入导出功能进行批量数据管理
 - **版本对比**：支持词级和行级两种对比模式
 - **主题切换**：点击右上角主题按钮切换深色/浅色模式
+ 
+### 访问密码设置
+1. 打开“设置 → 访问密码”。
+2. 设置/修改密码（4–8 位）。
+3. 选择模式：
+   - 指定提示词密码：在提示词编辑页勾选“该提示词需要密码访问”。
+   - 全局密码：开启后访问任意页面均需先登录。
+4. 首页在“指定提示词密码”模式下会隐藏受保护提示词的标签、备注和内容，仅显示“来源：需要密码”；点击卡片可解锁。
 
 ### 首页视图切换（桌面端）
 - 位置：提示词统计栏下方、列表上方的圆角小按钮。
@@ -253,6 +274,16 @@ app.run(host='0.0.0.0', port=3501, debug=True)
 - 默认每个提示词保留最新 200 个版本
 - 超出限制时自动删除最旧的版本
 - 可在设置页面调整此阈值
+
+### 安全与注意事项
+- 访问密码为轻量级访问控制，密码以 SHA-256 存储，无盐；请勿用于高安全场景。
+- 忘记密码可通过 SQLite 工具清除：
+  ```sql
+  -- 使用 sqlite3 打开数据库后执行
+  DELETE FROM settings WHERE key='auth_password_hash';
+  UPDATE settings SET value='off' WHERE key='auth_mode';
+  ```
+  清除后重启应用并在设置页重新配置。
 
 ## 🛠️ 开发说明
 
@@ -297,3 +328,4 @@ app.run(host='0.0.0.0', port=3501, debug=True)
 - ✅ 动态页面标题显示
 - ✅ 简化的用户界面
 - ✅ 增强的颜色主题系统
+ - ✅ 新增访问密码（关闭/指定提示词/全局）与卡片加锁显示
