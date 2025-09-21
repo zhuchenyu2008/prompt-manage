@@ -2,6 +2,26 @@
 
 一个功能完整的本地提示词管理系统，支持版本控制、搜索、标签管理、导入导出功能。采用Python + Flask + SQLite 构建，无需外部依赖，开箱即用。
 
+## 截图
+
+<details>
+  <summary>桌面端</summary>
+  <img src="https://github.com/user-attachments/assets/84d8e72f-a068-4b54-ae72-71346c7cdadc" alt="Desktop Screenshot 2025 09 21 - 20 41 45 41" style="width:65%;" />
+  <img src="https://github.com/user-attachments/assets/29682bef-9bf8-4cff-8934-ce66a6bb42c3" alt="Desktop Screenshot 2025 09 21 - 20 41 59 35" style="width:65%;" />
+  <img src="https://github.com/user-attachments/assets/20d9e1b6-c389-4252-82bf-bd157649ba52" alt="Desktop Screenshot 2025 09 21 - 20 42 07 66" style="width:65%;" />
+</details>
+
+<details>
+  <summary>移动端</summary>
+  <img width="412" height="909" alt="Desktop Screenshot 2025 09 21 - 20 42 21 12" src="https://github.com/user-attachments/assets/e75da247-129e-4dd5-97f3-2653d38e20fe" />
+<img width="402" height="909" alt="Desktop Screenshot 2025 09 21 - 20 42 48 13" src="https://github.com/user-attachments/assets/f6adcad4-6e56-4472-9ed7-3a00fa5eb77b" />
+<img width="400" height="909" alt="Desktop Screenshot 2025 09 21 - 20 42 53 56" src="https://github.com/user-attachments/assets/c2f982db-3981-4a3c-91ee-f4b6f7cf0052" />
+
+
+
+
+</details>
+
 ## ✨ 核心功能
 
 ### 📝 提示词管理
