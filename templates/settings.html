@@ -77,10 +77,19 @@
               设置/修改密码（4-8 位）
             </label>
             <div class="auth-fields">
+              {% if has_password %}
+              <input type="password" name="current_password" placeholder="当前密码（已设置时必填）" />
+              {% endif %}
               <input type="password" name="new_password" id="new_password" placeholder="新密码（留空则不修改）" />
               <input type="password" name="confirm_password" placeholder="确认新密码" />
             </div>
-            <div class="input-help">如从未设置过密码，请先设置后再开启对应模式。</div>
+            <div class="input-help">
+              {% if has_password %}
+              已设置密码：修改密码或切换密码模式需先验证当前密码。
+              {% else %}
+              如从未设置过密码，请先设置后再开启对应模式。
+              {% endif %}
+            </div>
           </div>
         </div>
       </div>

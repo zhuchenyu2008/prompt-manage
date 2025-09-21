@@ -3,6 +3,7 @@ import os
 import sqlite3
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file, jsonify, session
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 from io import BytesIO
 
@@ -192,6 +193,9 @@ def migrate_schema():
 
 
 app = Flask(__name__)
+# Respect X-Forwarded-* headers when behind reverse proxies (e.g., Nginx)
+# This ensures request.url/request.host reflect the external scheme/host.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret')
 # Jinja 过滤器：JSON 反序列化
 app.jinja_env.filters['loads'] = json.loads
@@ -211,7 +215,11 @@ def _before():
         # Allow login and static assets without auth
         allowed = (request.endpoint in {'login', 'static'}) or request.path.startswith('/static/')
         if not allowed and not session.get('auth_ok'):
-            nxt = request.url
+            # 使用相对路径避免因反向代理造成的主机/协议不一致
+            # 例如浏览器在 https 域名访问，但后端看到的是 http://127.0.0.1
+            # 这里将 next 归一化为相对路径，既安全也能避免跳回 127.0.0.1
+            nxt = request.full_path if request.query_string else request.path
+            nxt = nxt.rstrip('?')  # 某些情况下 full_path 末尾会带一个多余的 ?
             return redirect(url_for('login', next=nxt))
 
 
@@ -507,15 +515,31 @@ def settings():
         mode = request.form.get('auth_mode', 'off')
         if mode not in ('off', 'per', 'global'):
             mode = 'off'
+        current_pw = (request.form.get('current_password') or '').strip()
         new_pw = (request.form.get('new_password') or '').strip()
         confirm_pw = (request.form.get('confirm_password') or '').strip()
         saved_hash = get_setting(conn, 'auth_password_hash', '') or ''
         prev_mode = get_setting(conn, 'auth_mode', 'off') or 'off'
         mode_to_set = mode
+        # 当已存在密码时，调整认证相关设置（变更模式或修改密码）需要先验证当前密码
+        auth_settings_changed = (mode != prev_mode) or bool(new_pw)
+        if saved_hash and auth_settings_changed:
+            if not current_pw:
+                flash('请先输入当前密码以修改认证设置', 'error')
+                mode_to_set = prev_mode
+            elif hash_pw(current_pw) != saved_hash:
+                flash('当前密码不正确，无法修改认证设置', 'error')
+                mode_to_set = prev_mode
+            else:
+                # 当前密码验证通过，允许继续
+                pass
+
         if mode != 'off':
+            # 首次开启（尚未设置密码）必须设置新密码
             if not saved_hash and not new_pw:
                 flash('请先设置访问密码（4-8 位）', 'error')
                 mode_to_set = prev_mode  # 保持原状
+            # 如用户输入了新密码，则校验并更新
             if new_pw:
                 if new_pw != confirm_pw:
                     flash('两次输入的密码不一致', 'error')
@@ -576,8 +600,9 @@ def settings():
 
     threshold = get_setting(conn, 'version_cleanup_threshold', '200')
     auth_mode = get_setting(conn, 'auth_mode', 'off') or 'off'
+    has_password = bool(get_setting(conn, 'auth_password_hash', '') or '')
     conn.close()
-    return render_template('settings.html', threshold=threshold, auth_mode=auth_mode)
+    return render_template('settings.html', threshold=threshold, auth_mode=auth_mode, has_password=has_password)
 
 
 @app.route('/export')
@@ -782,10 +807,35 @@ def api_tags():
 
 # === 简易密码认证 ===
 import hashlib
+from urllib.parse import urlparse
 
 
 def hash_pw(pw: str) -> str:
     return hashlib.sha256((pw or '').encode('utf-8')).hexdigest()
+
+
+def _safe_next(default_path: str) -> str:
+    """Return a safe relative next path.
+    - If `next` is absent, return the provided default path.
+    - If `next` contains an absolute URL with a different host, ignore it.
+    - Always return a relative path (path + optional query).
+    """
+    raw = request.values.get('next')
+    if not raw:
+        return default_path
+    try:
+        p = urlparse(raw)
+        # Disallow external redirects; only same-host or relative permitted
+        if p.netloc and p.netloc != request.host:
+            return default_path
+        path = p.path or '/'
+        query = ('?' + p.query) if p.query else ''
+        # Ensure relative form
+        if not path.startswith('/'):
+            path = '/' + path
+        return path + query
+    except Exception:
+        return default_path
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -794,7 +844,7 @@ def login():
     mode = get_setting(conn, 'auth_mode', 'off') or 'off'
     saved_hash = get_setting(conn, 'auth_password_hash', '') or ''
     conn.close()
-    nxt = request.values.get('next') or url_for('index')
+    nxt = _safe_next(url_for('index'))
     if request.method == 'POST':
         password = (request.form.get('password') or '').strip()
         if not (4 <= len(password) <= 8):
@@ -827,7 +877,7 @@ def unlock_prompt(prompt_id):
     if not prompt:
         flash('提示词不存在', 'error')
         return redirect(url_for('index'))
-    nxt = request.values.get('next') or url_for('prompt_detail', prompt_id=prompt_id)
+    nxt = _safe_next(url_for('prompt_detail', prompt_id=prompt_id))
     if request.method == 'POST':
         password = (request.form.get('password') or '').strip()
         if not (4 <= len(password) <= 8):
