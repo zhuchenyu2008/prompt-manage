@@ -102,6 +102,28 @@
               </div>
 
               <div class="form-group">
+                <label for="color">
+                  <i class="fas fa-palette"></i>
+                  颜色
+                </label>
+                <div class="color-input">
+                  <div class="color-input-row">
+                    <div class="color-swatch-wrap">
+                      <span class="color-swatch" id="colorSwatch" title="选择颜色" role="button" tabindex="0" aria-label="选择颜色"></span>
+                      <input type="color" id="colorPicker" aria-label="选择颜色"
+                             value="{{ (prompt and prompt['color']) or '#409eff' }}" />
+                    </div>
+                    <input type="text" id="color" name="color" value="{{ (prompt and prompt['color']) or '' }}" 
+                           placeholder="例如 #409eff，留空不设置" />
+                    <button type="button" class="icon-btn" id="colorClearBtn" title="清除颜色">
+                      <i class="fas fa-eraser"></i>
+                    </button>
+                  </div>
+                  <div class="input-help">用于首页卡片边框的细微彩色外圈。留空则不设置。</div>
+                </div>
+              </div>
+
+              <div class="form-group">
                 <label for="notes">
                   <i class="fas fa-sticky-note"></i>
                   备注
@@ -354,6 +376,25 @@
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       gap: var(--spacing-lg);
     }
+
+    /* Color input styles */
+    .color-input { display: flex; flex-direction: column; gap: var(--spacing-xs); }
+    .color-input-row { display: flex; align-items: center; gap: var(--spacing-sm); }
+    .color-swatch-wrap { position: relative; width: 24px; height: 24px; display: inline-block; }
+    #colorPicker {
+      position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; opacity: 0; cursor: pointer;
+    }
+    #color { flex: 1; }
+    .color-swatch {
+      width: 22px; height: 22px; border-radius: 999px; flex-shrink: 0; display: block;
+      border: 1px solid var(--border);
+      background: transparent;
+      box-shadow: 0 1px 2px var(--shadow);
+      transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+      cursor: pointer;
+    }
+    .color-swatch:hover { transform: scale(1.05); box-shadow: 0 2px 6px var(--shadow); }
+    .color-invalid { border-color: var(--del) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--del) 10%, transparent) !important; }
     
     input[type="text"], select, textarea {
       width: 100%;

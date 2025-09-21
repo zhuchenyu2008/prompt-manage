@@ -33,6 +33,7 @@
 - **流畅动画**：精心设计的交互动画和过渡效果
 - **键盘快捷键**：支持 Ctrl+S 保存、Ctrl+P 预览等快捷操作
 - **桌面端视图切换**：首页支持列表/网格一键切换，并记住偏好
+- **提示词颜色标注（新）**：在“高级设置”为提示词设置颜色（支持 #RGB/#RRGGBB），首页卡片将显示细微的同色外圈；提供可视化取色器、小圆点预览与“一键清除”按钮；留空则不设置
 
 ### 📤 数据管理
 - **导入导出**：JSON 格式完整数据备份和恢复
@@ -178,7 +179,7 @@ prompt/
 
 ### 表结构
 - **prompts**: 提示词基本信息
-  - `id`, `name`, `source`, `notes`, `tags`, `pinned`, `created_at`, `updated_at`, `current_version_id`, `require_password`
+  - `id`, `name`, `source`, `notes`, `color`, `tags`, `pinned`, `created_at`, `updated_at`, `current_version_id`, `require_password`
 - **versions**: 版本历史记录
   - `id`, `prompt_id`, `version`, `content`, `created_at`, `parent_version_id`
 - **settings**: 系统设置
@@ -198,6 +199,7 @@ prompt/
       "name": "客服助手",
       "source": "ChatGPT",
       "notes": "处理客户咨询的标准回复模板",
+      "color": "#409eff",
       "tags": ["场景/客服", "业务/售后"],
       "pinned": true,
       "require_password": false,
@@ -246,6 +248,7 @@ prompt/
 - **批量操作**：通过导入导出功能进行批量数据管理
 - **版本对比**：支持词级和行级两种对比模式
 - **主题切换**：点击右上角主题按钮切换深色/浅色模式
+ - **颜色导入导出**：导出 JSON 包含 `color` 字段；导入时自动识别与校验（非法值忽略），留空按未设置处理
  
 ### 访问密码设置
 1. 打开“设置 → 访问密码”。
@@ -322,6 +325,7 @@ app.run(host='0.0.0.0', port=3501, debug=True)
 ## 📝 更新日志
 
 ### 最新功能
+- ✅ 新增提示词颜色标注：在“高级设置”可设置颜色（#RGB/#RRGGBB），首页卡片显示细微彩色外圈；内置可视化取色器、预览圆点与清除按钮；导入/导出完整支持 `color` 字段
 - ✅ 首页卡片式网格布局 + 桌面端视图开关
 - ✅ 完善的黑夜模式适配
 - ✅ 首页内容预览一键复制
@@ -330,7 +334,7 @@ app.run(host='0.0.0.0', port=3501, debug=True)
 - ✅ 增强的颜色主题系统
  - ✅ 新增访问密码（关闭/指定提示词/全局）与卡片加锁显示
 
-### 最新修复
+### 变更与修复
 - 统一使用相对路径作为 `next`
   - 在全局密码拦截中将 `next` 从 `request.url` 改为相对路径（如 `/settings?...`），避免出现 `http://127.0.0.1` 这类内部地址。
   - 在登录与解锁处理中对 `next` 做安全归一化，只允许站内相对路径，防止外部跳转导致失败或安全风险。

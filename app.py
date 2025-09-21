@@ -6,6 +6,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, sen
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 from io import BytesIO
+import re
 
 
 # Database path: allow override via env, default to container volume
@@ -28,6 +29,7 @@ def init_db():
             name TEXT NOT NULL,
             source TEXT,
             notes TEXT,
+            color TEXT,
             tags TEXT,
             pinned INTEGER DEFAULT 0,
             created_at TEXT,
@@ -178,6 +180,10 @@ def migrate_schema():
         cols = [r['name'] for r in cur.execute('PRAGMA table_info(prompts)').fetchall()]
         if 'require_password' not in cols:
             cur.execute("ALTER TABLE prompts ADD COLUMN require_password INTEGER DEFAULT 0")
+        # ensure prompts.color exists
+        cols = [r['name'] for r in cur.execute('PRAGMA table_info(prompts)').fetchall()]
+        if 'color' not in cols:
+            cur.execute("ALTER TABLE prompts ADD COLUMN color TEXT")
         # ensure auth settings keys exist
         cur.execute("INSERT OR IGNORE INTO settings(key, value) VALUES('auth_mode', 'off')")
         cur.execute("INSERT OR IGNORE INTO settings(key, value) VALUES('auth_password_hash', '')")
@@ -199,6 +205,21 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret')
 # Jinja 过滤器：JSON 反序列化
 app.jinja_env.filters['loads'] = json.loads
+
+
+def sanitize_color(val):
+    """Normalize color to #RRGGBB or return None if invalid/empty.
+    Accepts #RGB or #RRGGBB (case-insensitive). Returns lowercase #rrggbb.
+    """
+    s = (val or '').strip()
+    if not s:
+        return None
+    if re.fullmatch(r"#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})", s):
+        if len(s) == 4:
+            # expand #RGB to #RRGGBB
+            s = '#' + ''.join([c * 2 for c in s[1:]])
+        return s.lower()
+    return None
 
 
 @app.before_request
@@ -345,6 +366,7 @@ def new_prompt():
         name = request.form.get('name', '').strip() or '未命名提示词'
         source = request.form.get('source', '').strip()
         notes = request.form.get('notes', '').strip()
+        color = sanitize_color(request.form.get('color'))
         tags = parse_tags(request.form.get('tags', ''))
         content = request.form.get('content', '')
         bump_kind = request.form.get('bump_kind', 'patch')
@@ -354,8 +376,8 @@ def new_prompt():
         cur = conn.cursor()
         ts = now_ts()
         cur.execute(
-            "INSERT INTO prompts(name, source, notes, tags, pinned, created_at, updated_at, require_password) VALUES(?,?,?,?,0,?,?,?)",
-            (name, source, notes, json.dumps(tags, ensure_ascii=False), ts, ts, require_password)
+            "INSERT INTO prompts(name, source, notes, color, tags, pinned, created_at, updated_at, require_password) VALUES(?,?,?,?,?,0,?,?,?)",
+            (name, source, notes, color, json.dumps(tags, ensure_ascii=False), ts, ts, require_password)
         )
         pid = cur.lastrowid
         version = bump_version(None, bump_kind)
@@ -386,6 +408,7 @@ def prompt_detail(prompt_id):
         name = request.form.get('name', '').strip() or '未命名提示词'
         source = request.form.get('source', '').strip()
         notes = request.form.get('notes', '').strip()
+        color = sanitize_color(request.form.get('color'))
         tags = parse_tags(request.form.get('tags', ''))
         content = request.form.get('content', '')
         bump_kind = request.form.get('bump_kind', 'patch')
@@ -393,8 +416,8 @@ def prompt_detail(prompt_id):
         require_password = 1 if request.form.get('require_password') == '1' else 0
         ts = now_ts()
 
-        conn.execute("UPDATE prompts SET name=?, source=?, notes=?, tags=?, updated_at=?, require_password=? WHERE id=?",
-                     (name, source, notes, json.dumps(tags, ensure_ascii=False), ts, require_password, prompt_id))
+        conn.execute("UPDATE prompts SET name=?, source=?, notes=?, color=?, tags=?, updated_at=?, require_password=? WHERE id=?",
+                     (name, source, notes, color, json.dumps(tags, ensure_ascii=False), ts, require_password, prompt_id))
 
         if do_save_version:
             # 取当前版本号
@@ -566,12 +589,13 @@ def settings():
                 prompts = data
             for p in prompts:
                 cur.execute(
-                    "INSERT INTO prompts(id, name, source, notes, tags, pinned, created_at, updated_at, current_version_id, require_password) VALUES(?,?,?,?,?,?,?,?,NULL,?)",
+                    "INSERT INTO prompts(id, name, source, notes, color, tags, pinned, created_at, updated_at, current_version_id, require_password) VALUES(?,?,?,?,?,?,?,?,?,NULL,?)",
                     (
                         p.get('id'),
                         p.get('name'),
                         p.get('source'),
                         p.get('notes'),
+                        sanitize_color(p.get('color')),
                         json.dumps(p.get('tags') or [], ensure_ascii=False),
                         1 if p.get('pinned') else 0,
                         p.get('created_at') or now_ts(),
@@ -617,6 +641,7 @@ def export_all():
             'name': p['name'],
             'source': p['source'],
             'notes': p['notes'],
+            'color': p['color'],
             'tags': json.loads(p['tags']) if p['tags'] else [],
             'pinned': bool(p['pinned']),
             'require_password': bool(p['require_password']) if 'require_password' in p.keys() else False,

@@ -445,6 +445,17 @@ textarea {
   box-shadow: 0 12px 40px var(--shadow-hover);
   border-color: color-mix(in srgb, var(--primary) 20%, var(--border));
 }
+
+/* Accent color ring for cards (optional) */
+.card.color-ring {
+  /* subtle outer ring similar to border */
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+.card.color-ring:hover {
+  /* preserve hover elevation while keeping the ring */
+  box-shadow: 0 0 0 2px var(--accent), 0 12px 40px var(--shadow-hover);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+}
 .card-hd { 
   display: flex; 
   align-items: center; 

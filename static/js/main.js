@@ -281,6 +281,80 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // Color picker + preview sync
+  const colorInput = document.getElementById('color');
+  const colorPicker = document.getElementById('colorPicker');
+  const colorSwatch = document.getElementById('colorSwatch');
+  const colorClearBtn = document.getElementById('colorClearBtn');
+  if (colorInput && colorPicker && colorSwatch) {
+    const isValidHex = (s) => /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test((s || '').trim());
+    const expandHex = (s) => {
+      s = (s || '').trim();
+      if (!s) return '';
+      if (!isValidHex(s)) return '';
+      if (s.length === 4) {
+        return '#' + s.slice(1).split('').map(c => c + c).join('').toLowerCase();
+      }
+      return s.toLowerCase();
+    };
+    const applySwatch = (val) => {
+      const v = expandHex(val);
+      colorSwatch.style.background = v ? v : 'transparent';
+    };
+
+    // Init swatch from current text value only (empty -> transparent)
+    applySwatch(colorInput.value);
+
+    colorPicker.addEventListener('input', () => {
+      const v = (colorPicker.value || '').toLowerCase();
+      colorInput.value = v;
+      colorInput.classList.remove('color-invalid');
+      applySwatch(v);
+    });
+
+    colorInput.addEventListener('input', () => {
+      const raw = colorInput.value;
+      if (!raw) {
+        colorInput.classList.remove('color-invalid');
+        applySwatch('');
+        return;
+      }
+      if (isValidHex(raw)) {
+        colorInput.classList.remove('color-invalid');
+        // Sync picker with expanded hex (#RGB -> #RRGGBB)
+        const v = expandHex(raw);
+        try { colorPicker.value = v; } catch (_) {}
+        applySwatch(v);
+      } else {
+        colorInput.classList.add('color-invalid');
+      }
+    });
+
+    colorInput.addEventListener('blur', () => {
+      // Normalize on blur
+      const v = expandHex(colorInput.value);
+      if (v) colorInput.value = v;
+    });
+
+    // Swatch opens native color picker
+    const openPicker = () => {
+      try { colorPicker.showPicker ? colorPicker.showPicker() : colorPicker.click(); } catch (_) { colorPicker.click(); }
+    };
+    colorSwatch.addEventListener('click', openPicker);
+    colorSwatch.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPicker(); }
+    });
+
+    // Clear button
+    if (colorClearBtn) {
+      colorClearBtn.addEventListener('click', () => {
+        colorInput.value = '';
+        colorInput.classList.remove('color-invalid');
+        applySwatch('');
+      });
+    }
+  }
+
   // Ripple effect for buttons
   document.querySelectorAll('.btn').forEach(button => {
     button.addEventListener('click', function(e) {
