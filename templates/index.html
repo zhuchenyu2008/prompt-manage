@@ -137,7 +137,7 @@
       <div id="promptList" class="list grid-view">
       {% for p in prompts %}
         {% set is_locked = (auth_mode == 'per') and (p['id'] in locked_ids) %}
-        <article class="card" style="animation-delay: {{ loop.index * 0.1 }}s;">
+        <article class="card{% if p['color'] %} color-ring{% endif %}" style="animation-delay: {{ loop.index * 0.1 }}s;{% if p['color'] %} --accent: {{ p['color'] }};{% endif %}">
             <div class="card-header">
               <div class="card-title-area">
                 <a href="{{ url_for('unlock_prompt', prompt_id=p['id']) if is_locked else url_for('prompt_detail', prompt_id=p['id']) }}" class="card-title">
