@@ -89,6 +89,8 @@ docker run -d \
   -v prompt-data:/app/data \
   zhuchenyu2008/prompt-manage:latest
 
+# 可选：通过 -e DB_PATH=... 或 -e SECRET_KEY=... 覆盖默认配置
+
 # 访问应用
 # http://localhost:3501
 ```
@@ -100,19 +102,19 @@ docker run -d \
 1. **克隆项目**
    ```bash
    git clone https://github.com/zhuchenyu2008/prompt-manage
-   cd prompt
+   cd prompt-manage
    ```
 
 2. **启动应用（本地构建）**
    ```bash
-   # 启动服务
-   docker-compose up
-   # 或后台运行
-   docker-compose up -d
+   # 首次运行建议构建镜像
+   docker compose up --build
+   # 后续可直接启动或后台运行
+   docker compose up -d
    ```
    访问：http://localhost:3501
 
-3. **使用以构建的镜像（生产推荐）**
+3. **使用已构建的镜像（生产推荐）**
    若希望直接使用已发布的官方镜像，可将 `docker-compose.yml` 中的 `build:` 替换为：
    ```yaml
    services:
@@ -124,8 +126,12 @@ docker run -d \
          - prompt-data:/app/data
        environment:
          - FLASK_ENV=production
+         # 可选：添加 SECRET_KEY=your-secret-value
        restart: unless-stopped
+   volumes:
+     prompt-data:
    ```
+   保存后执行 `docker compose up -d` 即可。
 
 #### 使用单独的 Docker
 
@@ -149,11 +155,15 @@ docker run -d -p 3501:3501 -v prompt-data:/app/data prompt-manager
 1. **克隆或下载项目**
    ```bash
    git clone https://github.com/zhuchenyu2008/prompt-manage
-   cd prompt
+   cd prompt-manage
    ```
 
 2. **安装依赖**
    ```bash
+   # 可选：创建并激活虚拟环境
+   python -m venv .venv
+   source .venv/bin/activate  # Windows 使用 .venv\Scripts\activate
+
    pip install -r requirements.txt
    ```
 
@@ -172,27 +182,25 @@ docker run -d -p 3501:3501 -v prompt-data:/app/data prompt-manager
 ## 📁 项目结构
 
 ```
-prompt/
+prompt-manage/
 ├── app.py              # Flask 应用主文件
 ├── requirements.txt    # Python 依赖文件
-├── data.sqlite3        # 本地运行时可选的数据库文件（通过 DB_PATH 指向）
 ├── Dockerfile          # Docker 镜像配置
 ├── docker-compose.yml  # Docker Compose 配置文件
-├── .dockerignore       # Docker 构建忽略文件
+├── static/             # 静态资源
+│   ├── css/
+│   │   └── style.css   # 核心样式
+│   └── js/
+│       └── main.js     # 前端脚本
 ├── templates/          # HTML 模板
 │   ├── layout.html     # 基础布局模板
-│   ├── index.html      # 首页（卡片/列表切换 + 预览）
-│   ├── prompt_detail.html # 详情页(编辑页面)
+│   ├── index.html      # 首页（搜索、筛选、卡片/列表切换）
+│   ├── prompt_detail.html # 提示词编辑页面
 │   ├── versions.html   # 版本历史页面
 │   ├── diff.html       # 对比页面
 │   ├── settings.html   # 设置页面
 │   └── auth.html       # 登录/解锁页面（访问密码）
-├── static/             # 静态资源
-│   ├── css/
-│   │   └── style.css   # 样式文件
-│   └── js/
-│       └── main.js     # 前端脚本
-└── README.md           # 项目说明文档
+└── README.md           # 项目说明文档（当前文件）
 ```
 
 ## 🗄️ 数据库结构
@@ -260,6 +268,7 @@ prompt/
 3. **搜索和筛选**
    - 使用首页搜索框进行全文搜索
    - 支持按创建时间、修改时间、名称、标签排序
+   - 可通过右侧侧边栏多选标签/来源筛选，配合实时计数快速缩小范围
    - 置顶重要提示词便于快速访问
 
 ### 高级功能
@@ -268,7 +277,7 @@ prompt/
 - **批量操作**：通过导入导出功能进行批量数据管理
 - **版本对比**：支持词级和行级两种对比模式
 - **主题切换**：点击右上角主题按钮切换深色/浅色模式
- - **颜色导入导出**：导出 JSON 包含 `color` 字段；导入时自动识别与校验（非法值忽略），留空按未设置处理
+- **颜色导入导出**：导出 JSON 包含 `color` 字段；导入时自动识别与校验（非法值忽略），留空按未设置处理
  
 ### 访问密码设置
 1. 打开“设置 → 访问密码”。
@@ -327,7 +336,7 @@ app.run(host='0.0.0.0', port=3501, debug=True)
 ## 🔧 故障排除
 
 ### 常见问题
-1. **依赖缺失**：运行 `pip install flask` 安装 Flask 框架
+1. **依赖缺失**：运行 `pip install -r requirements.txt` 安装全部依赖
 2. **端口占用**：修改 `app.py` 中的端口号
 3. **权限问题**：确保对当前目录有读写权限
 4. **数据库损坏**：删除 DB_PATH 指向的数据库文件后重新生成（容器默认 `/app/data/data.sqlite3`；本地示例 `./data.sqlite3`）
@@ -341,18 +350,22 @@ app.run(host='0.0.0.0', port=3501, debug=True)
   - 容器/Compose 默认：`/app/data/data.sqlite3`
   - 本地运行示例：`DB_PATH=./data.sqlite3 python app.py`
   - 未设置时使用默认值；应用会在首次访问时自动创建目录与数据库文件
+- SECRET_KEY: Flask 会话密钥
+  - 默认值：`dev-secret`
+  - 生产环境请通过环境变量设置为随机字符串，用于保护登录/解锁会话
 
 ## 📝 更新日志
 
 ### 最新功能
 - ✅ 新增提示词颜色标注：在“高级设置”可设置颜色（#RGB/#RRGGBB），首页卡片显示细微彩色外圈；内置可视化取色器、预览圆点与清除按钮；导入/导出完整支持 `color` 字段
 - ✅ 首页卡片式网格布局 + 桌面端视图开关
+- ✅ 标签/来源多维筛选侧边栏，支持多选过滤与实时统计
 - ✅ 完善的黑夜模式适配
 - ✅ 首页内容预览一键复制
 - ✅ 动态页面标题显示
 - ✅ 简化的用户界面
 - ✅ 增强的颜色主题系统
- - ✅ 新增访问密码（关闭/指定提示词/全局）与卡片加锁显示
+- ✅ 新增访问密码（关闭/指定提示词/全局）与卡片加锁显示
 
 ### 变更与修复
 - 统一使用相对路径作为 `next`
