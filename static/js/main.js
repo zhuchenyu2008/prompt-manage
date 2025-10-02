@@ -55,6 +55,7 @@
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
+  const APP_LANG = (window.APP_LANG || 'zh');
   // Theme toggle with smooth transition (two states: light/dark)
   const btn = document.getElementById('themeToggle');
   if (btn) {
@@ -253,12 +254,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const submitBtn = form.querySelector('button[type="submit"]');
       if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="loading"></span> 处理中...';
+        const processing = APP_LANG === 'en' ? 'Processing...' : '处理中...';
+        submitBtn.innerHTML = '<span class="loading"></span> ' + processing;
         
         // Re-enable after 5 seconds (fallback)
         setTimeout(() => {
           submitBtn.disabled = false;
-          submitBtn.innerHTML = submitBtn.dataset.originalText || '提交';
+          const fallback = APP_LANG === 'en' ? 'Submit' : '提交';
+          submitBtn.innerHTML = submitBtn.dataset.originalText || fallback;
         }, 5000);
       }
     });
@@ -433,7 +436,8 @@ const utils = {
   // Format date for display
   formatDate: (dateString) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('zh-CN', {
+    const locale = (window.APP_LANG === 'en') ? 'en-US' : 'zh-CN';
+    return date.toLocaleDateString(locale, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -449,7 +453,7 @@ const utils = {
       
       if (button) {
         const originalText = button.textContent;
-        button.textContent = '已复制!';
+        button.textContent = (window.APP_LANG === 'en') ? 'Copied!' : '已复制!';
         button.style.background = 'var(--ins)';
         button.style.color = 'var(--text-on-success)';
         
