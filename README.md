@@ -13,6 +13,7 @@ A fully functional local prompt management system that supports version control,
 - **内容预览**：首页显示内容摘要，支持一键复制完整内容
 - **置顶功能**：重要提示词可置顶显示
 - **智能搜索**：支持名称、来源、备注、标签、内容的全文搜索
+- **语言切换**：支持中/英切换
 
 ### 🔄 版本控制系统
 - **语义化版本**：遵循 `主版本.次版本.补丁版本` 格式
