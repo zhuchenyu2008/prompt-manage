@@ -4,6 +4,9 @@ Language: English | [简体中文](README.md)
 
 A feature-complete local prompt management system with versioning, search, tags, and import/export. Built with Python + Flask + SQLite — no external services or build steps required.
 
+## Change Language:
+Default is Chinese. You can switch to English in the "设置-语言-英文" at the top right corner.
+
 ## ✨ Core Features
 
 ### 📝 Prompt Management
@@ -11,6 +14,7 @@ A feature-complete local prompt management system with versioning, search, tags,
 - Content preview: show summary on home; one-click copy full content
 - Pin important prompts for quick access
 - Smart search across name, source, notes, tags and content
+- Language Switching: Supports Chinese/English toggle
 
 ### 🔄 Versioning
 - Semantic versioning: `major.minor.patch`
