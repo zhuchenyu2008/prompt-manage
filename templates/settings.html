@@ -1,18 +1,18 @@
 {% extends 'layout.html' %}
-{% block title %}设置 - Prompt 管理器{% endblock %}
+{% block title %}{{ t('设置') }} - {{ t('Prompt 管理器') }}{% endblock %}
 {% block content %}
   <div class="back-line">
     <a href="{{ url_for('index') }}" class="btn ghost back-btn" onclick="if (window.history.length > 1) { history.back(); return false; }">
       <i class="fas fa-arrow-left"></i>
-      返回
+      {{ t('返回') }}
     </a>
   </div>
   <div class="page-header">
     <h1 class="page-title">
       <i class="fas fa-cog"></i>
-      系统设置
+      {{ t('系统设置') }}
     </h1>
-    <p class="page-subtitle">管理您的提示词库配置</p>
+    <p class="page-subtitle">{{ t('管理您的提示词库配置') }}</p>
   </div>
 
   <div class="settings-container">
@@ -20,21 +20,45 @@
     <form method="post" enctype="multipart/form-data" class="settings-form">
       <div class="settings-section">
         <div class="section-header">
+          <i class="fas fa-language"></i>
+          <h3>{{ t('语言') }}</h3>
+        </div>
+        <div class="section-content">
+          <div class="form-group">
+            <label style="display:block; font-weight:600; margin-bottom:8px;">{{ t('系统语言') }}</label>
+            <div class="auth-mode-group">
+              <label class="auth-option">
+                <input type="radio" name="language" value="zh" {% if language=='zh' %}checked{% endif %} />
+                <span class="chip"><i class="fas fa-font"></i> {{ t('中文') }}</span>
+              </label>
+              <label class="auth-option">
+                <input type="radio" name="language" value="en" {% if language=='en' %}checked{% endif %} />
+                <span class="chip"><i class="fas fa-font"></i> {{ t('英文') }}</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-divider"></div>
+
+      <div class="settings-section">
+        <div class="section-header">
           <i class="fas fa-broom"></i>
-          <h3>版本历史清理</h3>
+          <h3>{{ t('版本历史清理') }}</h3>
         </div>
         <div class="section-content">
           <p class="help-text">
             <i class="fas fa-info-circle"></i>
-            每个提示词仅保留最近 N 个版本，超出将自动清理（默认 200）。
+            {{ t('每个提示词仅保留最近 N 个版本，超出将自动清理（默认 200）。') }}
           </p>
           <div class="form-group">
             <label>
               <i class="fas fa-hashtag"></i>
-              清理阈值 N
+              {{ t('清理阈值 N') }}
               <div class="input-wrapper">
                 <input type="number" name="version_cleanup_threshold" min="1" value="{{ threshold }}" />
-                <span class="input-suffix">个版本</span>
+                <span class="input-suffix">{{ t('个版本') }}</span>
               </div>
             </label>
           </div>
@@ -46,27 +70,27 @@
       <div class="settings-section">
         <div class="section-header">
           <i class="fas fa-lock"></i>
-          <h3>访问密码</h3>
+          <h3>{{ t('访问密码') }}</h3>
         </div>
         <div class="section-content">
           <p class="help-text">
             <i class="fas fa-info-circle"></i>
-            三选一：关闭（不需要密码）、指定提示词密码（仅对勾选了“需要密码”的提示词生效）、全局密码（访问本站任意页面需要密码）。
+            {{ t('三选一：关闭（不需要密码）、指定提示词密码（仅对勾选了“需要密码”的提示词生效）、全局密码（访问本站任意页面需要密码）。') }}
           </p>
           <div class="form-group">
-            <label style="display:block; font-weight:600; margin-bottom:8px;">密码模式</label>
+            <label style="display:block; font-weight:600; margin-bottom:8px;">{{ t('密码模式') }}</label>
             <div class="auth-mode-group">
               <label class="auth-option">
                 <input type="radio" name="auth_mode" value="off" {% if auth_mode=='off' %}checked{% endif %} />
-                <span class="chip"><i class="fas fa-ban"></i> 关闭</span>
+                <span class="chip"><i class="fas fa-ban"></i> {{ t('关闭') }}</span>
               </label>
               <label class="auth-option">
                 <input type="radio" name="auth_mode" value="per" {% if auth_mode=='per' %}checked{% endif %} />
-                <span class="chip"><i class="fas fa-bullseye"></i> 指定提示词密码</span>
+                <span class="chip"><i class="fas fa-bullseye"></i> {{ t('指定提示词密码') }}</span>
               </label>
               <label class="auth-option">
                 <input type="radio" name="auth_mode" value="global" {% if auth_mode=='global' %}checked{% endif %} />
-                <span class="chip"><i class="fas fa-globe"></i> 全局密码</span>
+                <span class="chip"><i class="fas fa-globe"></i> {{ t('全局密码') }}</span>
               </label>
             </div>
           </div>
@@ -74,20 +98,20 @@
           <div class="form-group">
             <label for="new_password">
               <i class="fas fa-key"></i>
-              设置/修改密码（4-8 位）
+              {{ t('设置/修改密码（4-8 位）') }}
             </label>
             <div class="auth-fields">
               {% if has_password %}
-              <input type="password" name="current_password" placeholder="当前密码（已设置时必填）" />
+              <input type="password" name="current_password" placeholder="{{ t('当前密码（已设置时必填）') }}" />
               {% endif %}
-              <input type="password" name="new_password" id="new_password" placeholder="新密码（留空则不修改）" />
-              <input type="password" name="confirm_password" placeholder="确认新密码" />
+              <input type="password" name="new_password" id="new_password" placeholder="{{ t('新密码（留空则不修改）') }}" />
+              <input type="password" name="confirm_password" placeholder="{{ t('确认新密码') }}" />
             </div>
             <div class="input-help">
               {% if has_password %}
-              已设置密码：修改密码或切换密码模式需先验证当前密码。
+              {{ t('已设置密码：修改密码或切换密码模式需先验证当前密码。') }}
               {% else %}
-              如从未设置过密码，请先设置后再开启对应模式。
+              {{ t('如从未设置过密码，请先设置后再开启对应模式。') }}
               {% endif %}
             </div>
           </div>
@@ -99,36 +123,36 @@
       <div class="settings-section">
         <div class="section-header">
           <i class="fas fa-exchange-alt"></i>
-          <h3>数据导入 / 导出</h3>
+          <h3>{{ t('数据导入 / 导出') }}</h3>
         </div>
         <div class="section-content">
           <div class="import-export-grid">
             <div class="export-section">
               <div class="action-header">
                 <i class="fas fa-download"></i>
-                <h4>导出数据</h4>
+                <h4>{{ t('导出数据') }}</h4>
               </div>
               <p class="action-description">
-                将所有提示词和版本历史导出为 JSON 格式文件
+                {{ t('将所有提示词和版本历史导出为 JSON 格式文件') }}
               </p>
               <a href="{{ url_for('export_all') }}" class="btn primary export-btn">
                 <i class="fas fa-file-export"></i>
-                导出全部数据
+                {{ t('导出全部数据') }}
               </a>
             </div>
             
             <div class="import-section">
               <div class="action-header">
                 <i class="fas fa-upload"></i>
-                <h4>导入数据</h4>
+                <h4>{{ t('导入数据') }}</h4>
               </div>
               <p class="action-description warning">
                 <i class="fas fa-exclamation-triangle"></i>
-                导入将覆盖所有现有数据，请谨慎操作
+                {{ t('导入将覆盖所有现有数据，请谨慎操作') }}
               </p>
               <label class="upload-btn">
                 <i class="fas fa-file-import"></i>
-                选择 JSON 文件
+                {{ t('选择 JSON 文件') }}
                 <input type="file" name="import_file" accept="application/json" />
               </label>
             </div>
@@ -139,11 +163,11 @@
       <div class="form-actions">
         <button class="btn primary" type="submit">
           <i class="fas fa-save"></i>
-          保存设置 / 执行导入
+          {{ t('保存设置 / 执行导入') }}
         </button>
         <a href="{{ url_for('index') }}" class="btn ghost">
           <i class="fas fa-times"></i>
-          取消
+          {{ t('取消') }}
         </a>
       </div>
     </form>

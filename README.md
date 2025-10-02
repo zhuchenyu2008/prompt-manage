@@ -1,26 +1,8 @@
 # Prompt 管理器
 
+语言: 简体中文 | [English](README.en.md)
+
 一个功能完整的本地提示词管理系统，支持版本控制、搜索、标签管理、导入导出功能。采用Python + Flask + SQLite 构建，无需外部依赖，开箱即用。
-
-## 截图
-
-<details>
-  <summary>桌面端</summary>
-  <img src="https://github.com/user-attachments/assets/84d8e72f-a068-4b54-ae72-71346c7cdadc" alt="Desktop Screenshot 2025 09 21 - 20 41 45 41" style="width:65%;" />
-  <img src="https://github.com/user-attachments/assets/29682bef-9bf8-4cff-8934-ce66a6bb42c3" alt="Desktop Screenshot 2025 09 21 - 20 41 59 35" style="width:65%;" />
-  <img src="https://github.com/user-attachments/assets/20d9e1b6-c389-4252-82bf-bd157649ba52" alt="Desktop Screenshot 2025 09 21 - 20 42 07 66" style="width:65%;" />
-</details>
-
-<details>
-  <summary>移动端</summary>
-  <img width="412" height="909" alt="Desktop Screenshot 2025 09 21 - 20 42 21 12" src="https://github.com/user-attachments/assets/e75da247-129e-4dd5-97f3-2653d38e20fe" />
-<img width="402" height="909" alt="Desktop Screenshot 2025 09 21 - 20 42 48 13" src="https://github.com/user-attachments/assets/f6adcad4-6e56-4472-9ed7-3a00fa5eb77b" />
-<img width="400" height="909" alt="Desktop Screenshot 2025 09 21 - 20 42 53 56" src="https://github.com/user-attachments/assets/c2f982db-3981-4a3c-91ee-f4b6f7cf0052" />
-
-
-
-
-</details>
 
 ## ✨ 核心功能
 
@@ -54,18 +36,20 @@
 - **键盘快捷键**：支持 Ctrl+S 保存、Ctrl+P 预览等快捷操作
 - **桌面端视图切换**：首页支持列表/网格一键切换，并记住偏好
 - **提示词颜色标注（新）**：在“高级设置”为提示词设置颜色（支持 #RGB/#RRGGBB），首页卡片将显示细微的同色外圈；提供可视化取色器、小圆点预览与“一键清除”按钮；留空则不设置
+ - **界面语言（新）**：在“设置”中可切换界面语言（中文/英文），默认中文
 
 ### 📤 数据管理
 - **导入导出**：JSON 格式完整数据备份和恢复
 - **数据安全**：本地 SQLite 存储，无云端依赖
 - **设置管理**：可配置版本清理阈值与访问密码等系统参数
+  - 支持切换界面语言（中文/英文）
 
 ### 🔒 访问密码（可选）
 - 三选一模式（设置页）：关闭 / 指定提示词密码 / 全局密码
 - 密码要求：4–8 位，首次启用需先设置密码
 - 指定提示词密码：在提示词编辑页勾选“该提示词需要密码访问”
 - 首页行为（指定提示词密码模式）：受保护卡片仅显示标题与“来源：需要密码”，不展示标签、备注与内容预览；点击卡片进入解锁页
-- 会话解锁：本次会话内对已解锁的提示词放行
+- 会话解锁：本次会话内对已解锁的提示词放行；可通过右上角“退出”清除认证
 
 ## 🚀 快速开始
 

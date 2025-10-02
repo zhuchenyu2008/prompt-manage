@@ -1,5 +1,5 @@
 {% extends 'layout.html' %}
-{% block title %}版本对比 - {{ prompt['name'] }} - Prompt 管理器{% endblock %}
+{% block title %}{{ t('版本对比') }} - {{ prompt['name'] }} - {{ t('Prompt 管理器') }}{% endblock %}
 {% block content %}
   <div class="diff-page">
     <!-- 页面头部 -->
@@ -8,23 +8,23 @@
         <div class="header-main">
           <h1 class="page-title">
             <i class="fas fa-code-compare"></i>
-            版本对比
+            {{ t('版本对比') }}
           </h1>
           <div class="breadcrumb">
             <a href="{{ url_for('index') }}" class="breadcrumb-item">
-              <i class="fas fa-home"></i> 首页
+              <i class="fas fa-home"></i> {{ t('首页') }}
             </a>
             <span class="breadcrumb-separator">/</span>
             <a href="{{ url_for('prompt_detail', prompt_id=prompt['id']) }}" class="breadcrumb-item">
               {{ prompt['name'] }}
             </a>
             <span class="breadcrumb-separator">/</span>
-            <span class="breadcrumb-item active">版本对比</span>
+            <span class="breadcrumb-item active">{{ t('版本对比') }}</span>
           </div>
         </div>
         <div class="header-actions">
           <a href="{{ url_for('prompt_detail', prompt_id=prompt['id']) }}" class="btn ghost">
-            <i class="fas fa-arrow-left"></i> 返回编辑
+            <i class="fas fa-arrow-left"></i> {{ t('返回编辑') }}
           </a>
         </div>
       </div>
@@ -35,7 +35,7 @@
       <form method="get" class="diff-form" action="{{ url_for('diff_view', prompt_id=prompt['id']) }}">
         <div class="toolbar-grid">
           <label class="field field-left">
-            <span class="label"><i class="fas fa-arrow-left"></i> 左（旧）</span>
+            <span class="label"><i class="fas fa-arrow-left"></i> {{ t('左（旧）') }}</span>
             <select name="left" class="version-select">
               {% for v in versions %}
                 <option value="{{ v['id'] }}" {% if left and v['id']==left['id'] %}selected{% endif %}>{{ v['version'] }} · {{ (v['created_at'] or '')[:19].replace('T',' ') }}</option>
@@ -44,7 +44,7 @@
           </label>
           <div class="toolbar-right-row">
             <label class="field field-right">
-              <span class="label"><i class="fas fa-arrow-right"></i> 右（新）</span>
+              <span class="label"><i class="fas fa-arrow-right"></i> {{ t('右（新）') }}</span>
               <select name="right" class="version-select">
                 {% for v in versions %}
                   <option value="{{ v['id'] }}" {% if right and v['id']==right['id'] %}selected{% endif %}>{{ v['version'] }} · {{ (v['created_at'] or '')[:19].replace('T',' ') }}</option>
@@ -52,14 +52,14 @@
               </select>
             </label>
             <label class="field mode-field">
-              <span class="label"><i class="fas fa-sliders"></i> 模式</span>
+              <span class="label"><i class="fas fa-sliders"></i> {{ t('模式') }}</span>
               <select name="mode" class="version-select">
-                <option value="word" {% if mode=='word' %}selected{% endif %}>词级</option>
-                <option value="line" {% if mode=='line' %}selected{% endif %}>行级</option>
+                <option value="word" {% if mode=='word' %}selected{% endif %}>{{ t('词级') }}</option>
+                <option value="line" {% if mode=='line' %}selected{% endif %}>{{ t('行级') }}</option>
               </select>
             </label>
             <div class="actions">
-              <button class="btn primary" type="submit"><i class="fas fa-rotate"></i> 刷新</button>
+              <button class="btn primary" type="submit"><i class="fas fa-rotate"></i> {{ t('刷新') }}</button>
             </div>
           </div>
         </div>
@@ -70,8 +70,8 @@
     <section class="diff-view">
       <div class="diff-card">
         <div class="diff-header">
-          <div class="side side-left"><i class="fas fa-file-alt"></i> 旧版本：{{ left['version'] }} · {{ (left['created_at'] or '')[:19].replace('T',' ') }}</div>
-          <div class="side side-right"><i class="fas fa-file-alt"></i> 新版本：{{ right['version'] }} · {{ (right['created_at'] or '')[:19].replace('T',' ') }}</div>
+          <div class="side side-left"><i class="fas fa-file-alt"></i> {{ t('旧版本：') }}{{ left['version'] }} · {{ (left['created_at'] or '')[:19].replace('T',' ') }}</div>
+          <div class="side side-right"><i class="fas fa-file-alt"></i> {{ t('新版本：') }}{{ right['version'] }} · {{ (right['created_at'] or '')[:19].replace('T',' ') }}</div>
         </div>
         <div class="diff-container">
           {{ diff_html|safe }}

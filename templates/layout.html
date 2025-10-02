@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{{ lang_html }}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -7,7 +7,7 @@
   <!-- Mobile status bar colors for auto mode (follow OS) -->
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0b0b0f" media="(prefers-color-scheme: dark)">
-  <title>{% block title %}Prompt 管理器{% endblock %}</title>
+  <title>{% block title %}{{ t('Prompt 管理器') }}{% endblock %}</title>
   <script>
     // Apply saved manual theme ASAP to avoid flash; otherwise follow system
     (function() {
@@ -38,12 +38,12 @@
     <div class="brand">
       <a href="{{ url_for('index') }}">
         <i class="fas fa-folder-open"></i>
-        提示词管理
+        {{ t('提示词管理') }}
       </a>
     </div>
     <nav class="nav">
-      <a href="{{ url_for('settings') }}" class="btn ghost">设置</a>
-      <button id="themeToggle" class="btn ghost" title="切换主题">🌓</button>
+      <a href="{{ url_for('settings') }}" class="btn ghost">{{ t('设置') }}</a>
+      <button id="themeToggle" class="btn ghost" title="{{ t('切换主题') }}">🌓</button>
     </nav>
   </header>
 
@@ -51,7 +51,7 @@
     {% if messages %}
       <div class="flash-wrap">
         {% for category, message in messages %}
-          <div class="flash {{ category }}">{{ message }}</div>
+          <div class="flash {{ category }}">{{ t(message) }}</div>
         {% endfor %}
       </div>
     {% endif %}
@@ -61,6 +61,7 @@
     {% block content %}{% endblock %}
   </main>
 
+  <script>window.APP_LANG = '{{ lang }}';</script>
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

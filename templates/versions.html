@@ -1,5 +1,5 @@
 {% extends 'layout.html' %}
-{% block title %}历史版本 - {{ prompt['name'] }} - Prompt 管理器{% endblock %}
+{% block title %}{{ t('历史版本') }} - {{ prompt['name'] }} - {{ t('Prompt 管理器') }}{% endblock %}
 {% block content %}
   <div class="versions-page">
     <!-- 页面头部 -->
@@ -8,23 +8,23 @@
         <div class="header-main">
           <h1 class="page-title">
             <i class="fas fa-history"></i>
-            历史版本
+            {{ t('历史版本') }}
           </h1>
           <div class="breadcrumb">
             <a href="{{ url_for('index') }}" class="breadcrumb-item">
-              <i class="fas fa-home"></i> 首页
+              <i class="fas fa-home"></i> {{ t('首页') }}
             </a>
             <span class="breadcrumb-separator">/</span>
             <a href="{{ url_for('prompt_detail', prompt_id=prompt['id']) }}" class="breadcrumb-item">
               {{ prompt['name'] }}
             </a>
             <span class="breadcrumb-separator">/</span>
-            <span class="breadcrumb-item active">历史版本</span>
+            <span class="breadcrumb-item active">{{ t('历史版本') }}</span>
           </div>
         </div>
         <div class="header-actions">
           <a href="{{ url_for('prompt_detail', prompt_id=prompt['id']) }}" class="btn btn-outline">
-            <i class="fas fa-arrow-left"></i> 返回编辑
+            <i class="fas fa-arrow-left"></i> {{ t('返回编辑') }}
           </a>
         </div>
       </div>
@@ -46,7 +46,7 @@
           {% endif %}
           <span class="meta-item">
             <i class="fas fa-calendar"></i>
-            创建于 {{ prompt['created_at'][:19].replace('T',' ') }}
+            {{ t('创建于') }} {{ prompt['created_at'][:19].replace('T',' ') }}
           </span>
         </div>
       </div>
@@ -58,17 +58,17 @@
         <div class="empty-icon">
           <i class="fas fa-history"></i>
         </div>
-        <h3 class="empty-title">暂无历史版本</h3>
+        <h3 class="empty-title">{{ t('暂无历史版本') }}</h3>
         <p class="empty-description">
-          该提示词还没有保存过任何版本历史。<br>
-          开始编辑并保存版本来追踪内容变化。
+          {{ t('该提示词还没有保存过任何版本历史。') }}<br>
+          {{ t('开始编辑并保存版本来追踪内容变化。') }}
         </p>
         <div class="empty-actions">
           <a href="{{ url_for('prompt_detail', prompt_id=prompt['id']) }}" class="btn btn-primary">
-            <i class="fas fa-plus"></i> 创建第一个版本
+            <i class="fas fa-plus"></i> {{ t('创建第一个版本') }}
           </a>
           <a href="{{ url_for('index') }}" class="btn btn-outline">
-            <i class="fas fa-home"></i> 返回首页
+            <i class="fas fa-home"></i> {{ t('返回首页') }}
           </a>
         </div>
       </div>
@@ -82,7 +82,7 @@
             </div>
             <div class="stat-content">
               <div class="stat-value">{{ versions|length }}</div>
-              <div class="stat-label">总版本数</div>
+              <div class="stat-label">{{ t('总版本数') }}</div>
             </div>
           </div>
           
@@ -92,7 +92,7 @@
             </div>
             <div class="stat-content">
               <div class="stat-value">{{ versions[0]['created_at'][:19].replace('T',' ') }}</div>
-              <div class="stat-label">最近更新</div>
+              <div class="stat-label">{{ t('最近更新') }}</div>
             </div>
           </div>
           
@@ -103,7 +103,7 @@
             </div>
             <div class="stat-content">
               <div class="stat-value">{{ current['version'] }}</div>
-              <div class="stat-label">当前版本</div>
+              <div class="stat-label">{{ t('当前版本') }}</div>
             </div>
           </div>
           {% endif %}
@@ -111,7 +111,7 @@
         
         <div class="actions-bar">
           <button class="btn btn-primary" onclick="showDiffSelector()">
-            <i class="fas fa-code-compare"></i> 选择版本对比
+            <i class="fas fa-code-compare"></i> {{ t('选择版本对比') }}
           </button>
         </div>
       </div>
@@ -121,10 +121,10 @@
         <div class="section-header">
           <h2 class="section-title">
             <i class="fas fa-list"></i>
-            版本历史
+            {{ t('版本历史') }}
           </h2>
           <div class="section-subtitle">
-            按时间倒序排列，最新的版本显示在最前面
+            {{ t('按时间倒序排列，最新的版本显示在最前面') }}
           </div>
         </div>
 
@@ -142,7 +142,7 @@
                     {% if current and v['id']==current['id'] %}
                       <div class="current-badge">
                         <i class="fas fa-star"></i>
-                        <span>当前版本</span>
+                        <span>{{ t('当前版本') }}</span>
                       </div>
                     {% endif %}
                   </div>
@@ -156,8 +156,8 @@
                 <div class="version-preview">
                   <div class="preview-header">
                     <i class="fas fa-file-text"></i>
-                    <span>内容预览</span>
-                    <button class="btn btn-outline btn-sm copy-btn" onclick="copyPreviewContent(this)" data-content="{{ v['content']|e }}" title="复制内容">
+                    <span>{{ t('内容预览') }}</span>
+                    <button class="btn btn-outline btn-sm copy-btn" onclick="copyPreviewContent(this)" data-content="{{ v['content']|e }}" title="{{ t('复制内容') }}">
                       <i class="fas fa-copy"></i>
                     </button>
                   </div>
@@ -167,31 +167,31 @@
                 <!-- 版本操作 -->
                 <div class="version-actions">
                   <div class="action-group primary-actions">
-                    <button class="btn btn-outline btn-sm" onclick="viewVersion({{ v['id'] }})" title="查看完整版本内容">
+                    <button class="btn btn-outline btn-sm" onclick="viewVersion({{ v['id'] }})" title="{{ t('查看完整版本内容') }}">
                       <i class="fas fa-eye"></i>
-                      <span>查看详情</span>
+                      <span>{{ t('查看详情') }}</span>
                     </button>
                     
                     {% if current and v['id'] != current['id'] %}
-                    <button class="btn btn-outline btn-sm" onclick="compareWithCurrent({{ v['id'] }})" title="与当前版本对比">
+                    <button class="btn btn-outline btn-sm" onclick="compareWithCurrent({{ v['id'] }})" title="{{ t('与当前版本对比') }}">
                       <i class="fas fa-code-compare"></i>
-                      <span>对比差异</span>
+                      <span>{{ t('对比差异') }}</span>
                     </button>
                     {% endif %}
                   </div>
                   
                   <div class="action-group secondary-actions">
                     {% if current and v['id'] != current['id'] %}
-                    <button class="btn btn-primary btn-sm" onclick="rollbackToVersion({{ v['id'] }})" title="基于此版本内容创建新版本">
+                    <button class="btn btn-primary btn-sm" onclick="rollbackToVersion({{ v['id'] }})" title="{{ t('基于此版本内容创建新版本') }}">
                       <i class="fas fa-undo"></i>
-                      <span>恢复到此版本</span>
+                      <span>{{ t('恢复到此版本') }}</span>
                     </button>
                     {% endif %}
                     
                     {% if current and v['id'] == current['id'] %}
-                    <button class="btn btn-success btn-sm" disabled title="当前使用中">
+                    <button class="btn btn-success btn-sm" disabled title="{{ t('当前使用中') }}">
                       <i class="fas fa-check"></i>
-                      <span>当前使用中</span>
+                      <span>{{ t('当前使用中') }}</span>
                     </button>
                     {% endif %}
                   </div>
@@ -208,7 +208,7 @@
   <div id="versionModal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3><i class="fas fa-file-alt"></i> 版本内容</h3>
+        <h3><i class="fas fa-file-alt"></i> {{ t('版本内容') }}</h3>
         <button class="modal-close" onclick="closeVersionModal()">&times;</button>
       </div>
       <div class="modal-body">
@@ -219,9 +219,9 @@
           </div>
           <div class="version-content-wrapper">
             <div class="version-content-text" id="modalVersionContent"></div>
-            <button class="btn btn-primary btn-sm copy-modal-btn" onclick="copyModalContent()" title="复制内容">
+            <button class="btn btn-primary btn-sm copy-modal-btn" onclick="copyModalContent()" title="{{ t('复制内容') }}">
               <i class="fas fa-copy"></i>
-              <span>复制</span>
+              <span>{{ t('复制') }}</span>
             </button>
           </div>
         </div>
@@ -233,14 +233,14 @@
   <div id="diffModal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3><i class="fas fa-code-compare"></i> 选择对比版本</h3>
+        <h3><i class="fas fa-code-compare"></i> {{ t('选择对比版本') }}</h3>
         <button class="modal-close" onclick="closeDiffModal()">&times;</button>
       </div>
       <div class="modal-body">
         <div class="diff-selector">
           <div class="diff-options">
             <div class="diff-option">
-              <label>左侧版本：</label>
+              <label>{{ t('左侧版本：') }}</label>
               <select id="leftVersion" class="version-select">
                 {% for v in versions %}
                 <option value="{{ v['id'] }}">{{ v['version'] }} - {{ v['created_at'][:19].replace('T',' ') }}</option>
@@ -248,7 +248,7 @@
               </select>
             </div>
             <div class="diff-option">
-              <label>右侧版本：</label>
+              <label>{{ t('右侧版本：') }}</label>
               <select id="rightVersion" class="version-select">
                 {% for v in versions %}
                 <option value="{{ v['id'] }}" {% if loop.first %}selected{% endif %}>{{ v['version'] }} - {{ v['created_at'][:19].replace('T',' ') }}</option>
@@ -258,10 +258,10 @@
           </div>
           <div class="diff-actions-modal">
             <button class="btn btn-primary" onclick="performDiff()">
-              <i class="fas fa-code-compare"></i> 开始对比
+              <i class="fas fa-code-compare"></i> {{ t('开始对比') }}
             </button>
             <button class="btn btn-outline" onclick="closeDiffModal()">
-              <i class="fas fa-times"></i> 取消
+              <i class="fas fa-times"></i> {{ t('取消') }}
             </button>
           </div>
         </div>
@@ -1392,6 +1392,25 @@
   </style>
 
   <script>
+    const I18N = {
+      VERSION_PREFIX: {{ t('版本')|tojson }},
+      NO_CONTENT: {{ t('无内容')|tojson }},
+      VERSION_NOT_FOUND: {{ t('版本信息不存在，请刷新页面重试')|tojson }},
+      COPIED: {{ t('已复制')|tojson }},
+      COPY_FAIL: {{ t('复制失败，请手动选择文本复制')|tojson }},
+      PAGE_LOAD_ERROR: {{ t('页面加载错误，请刷新页面重试')|tojson }},
+      SELECT_DIFF_VERSION: {{ t('请选择要对比的版本')|tojson }},
+      SELECT_TWO_DIFF: {{ t('请选择两个不同的版本进行对比')|tojson }},
+      UNKNOWN: {{ t('未知')|tojson }},
+      ROLLBACK_CONFIRM_TITLE: {{ t('确定要回滚到版本 {version} 吗？')|tojson }},
+      ROLLBACK_NOTE_TITLE: {{ t('📝 回滚说明：')|tojson }},
+      ROLLBACK_NOTE_LINE1: {{ t('• 这将基于版本 {version} 的内容创建一个新版本')|tojson }},
+      ROLLBACK_NOTE_LINE2: {{ t('• 当前版本 {current} 不会被删除')|tojson }},
+      ROLLBACK_NOTE_LINE3: {{ t('• 新版本号将在当前版本基础上递增')|tojson }},
+      ROLLBACK_NOTE_LINE4: {{ t('• 所有版本历史都会保留')|tojson }},
+      ROLLBACK_CONFIRM_TAIL: {{ t('此操作不可撤销，是否继续？')|tojson }},
+      OPERATION_FAILED: {{ t('操作失败，请刷新页面重试')|tojson }}
+    };
     const versionsData = {{ versions|tojson }};
     const currentVersionId = {{ current['id'] if current else 'null' }};
     const promptId = {{ prompt['id'] }};
@@ -1399,12 +1418,12 @@
     function viewVersion(versionId) {
       const version = versionsData.find(v => v.id === versionId);
       if (version) {
-        document.getElementById('modalVersionTitle').textContent = `版本 ${version.version}`;
+        document.getElementById('modalVersionTitle').textContent = `${I18N.VERSION_PREFIX} ${version.version}`;
         document.getElementById('modalVersionTime').textContent = version.created_at.replace('T', ' ').substring(0, 19);
-        document.getElementById('modalVersionContent').textContent = version.content || '无内容';
+        document.getElementById('modalVersionContent').textContent = version.content || I18N.NO_CONTENT;
         document.getElementById('versionModal').style.display = 'block';
       } else {
-        alert('版本信息不存在，请刷新页面重试');
+        alert(I18N.VERSION_NOT_FOUND);
       }
     }
 
@@ -1444,7 +1463,7 @@
 
     async function copyModalContent() {
       const content = document.getElementById('modalVersionContent').textContent;
-      if (!content || content === '无内容') {
+      if (!content || content === I18N.NO_CONTENT) {
         return;
       }
       
@@ -1460,7 +1479,7 @@
         // Show success feedback
         const button = document.querySelector('.copy-modal-btn');
         const originalHTML = button.innerHTML;
-        button.innerHTML = '<i class="fas fa-check"></i> <span>已复制</span>';
+        button.innerHTML = '<i class="fas fa-check"></i> <span>' + I18N.COPIED + '</span>';
         
         setTimeout(() => {
           button.innerHTML = originalHTML;
@@ -1504,7 +1523,7 @@
             // Modal button feedback
             const modalBtn = document.querySelector('.copy-modal-btn');
             const originalHTML = modalBtn.innerHTML;
-            modalBtn.innerHTML = '<i class="fas fa-check"></i> <span>已复制</span>';
+            modalBtn.innerHTML = '<i class="fas fa-check"></i> <span>' + I18N.COPIED + '</span>';
             
             setTimeout(() => {
               modalBtn.innerHTML = originalHTML;
@@ -1515,7 +1534,7 @@
         }
       } catch (err) {
         console.error('Fallback copy failed:', err);
-        alert('复制失败，请手动选择文本复制');
+        alert(I18N.COPY_FAIL);
       }
       
       document.body.removeChild(textArea);
@@ -1526,7 +1545,7 @@
       const rightSelect = document.getElementById('rightVersion');
       
       if (!leftSelect || !rightSelect) {
-        alert('页面加载错误，请刷新页面重试');
+        alert(I18N.PAGE_LOAD_ERROR);
         return;
       }
       
@@ -1558,7 +1577,7 @@
       const rightSelect = document.getElementById('rightVersion');
       
       if (!leftSelect || !rightSelect) {
-        alert('页面加载错误，请刷新页面重试');
+        alert(I18N.PAGE_LOAD_ERROR);
         return;
       }
       
@@ -1566,12 +1585,12 @@
       const rightId = rightSelect.value;
       
       if (!leftId || !rightId) {
-        alert('请选择要对比的版本');
+        alert(I18N.SELECT_DIFF_VERSION);
         return;
       }
       
       if (leftId === rightId) {
-        alert('请选择两个不同的版本进行对比');
+        alert(I18N.SELECT_TWO_DIFF);
         return;
       }
       
@@ -1581,19 +1600,11 @@
     function rollbackToVersion(versionId) {
       const version = versionsData.find(v => v.id === versionId);
       if (!version) {
-        alert('版本信息不存在，请刷新页面重试');
+        alert(I18N.VERSION_NOT_FOUND);
         return;
       }
       
-      const message = `确定要回滚到版本 ${version.version} 吗？
-
-📝 回滚说明：
-• 这将基于版本 ${version.version} 的内容创建一个新版本
-• 当前版本 ${currentVersionId ? (versionsData.find(v => v.id === currentVersionId)?.version || '未知') : '未知'} 不会被删除
-• 新版本号将在当前版本基础上递增
-• 所有版本历史都会保留
-
-此操作不可撤销，是否继续？`;
+      const message = `${I18N.ROLLBACK_CONFIRM_TITLE.replace('{version}', version.version)}\n\n${I18N.ROLLBACK_NOTE_TITLE}\n${I18N.ROLLBACK_NOTE_LINE1.replace('{version}', version.version)}\n${I18N.ROLLBACK_NOTE_LINE2.replace('{current}', (currentVersionId ? (versionsData.find(v => v.id === currentVersionId)?.version || I18N.UNKNOWN) : I18N.UNKNOWN))}\n${I18N.ROLLBACK_NOTE_LINE3}\n${I18N.ROLLBACK_NOTE_LINE4}\n\n${I18N.ROLLBACK_CONFIRM_TAIL}`;
       
       if (confirm(message)) {
         try {
@@ -1612,7 +1623,7 @@
           document.body.appendChild(form);
           form.submit();
         } catch (error) {
-          alert('操作失败，请刷新页面重试');
+          alert(I18N.OPERATION_FAILED);
           console.error('Rollback error:', error);
         }
       }

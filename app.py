@@ -4,6 +4,7 @@ import sqlite3
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file, jsonify, session
 from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.exceptions import BadRequest
 from werkzeug.utils import secure_filename
 from io import BytesIO
 import re
@@ -65,6 +66,8 @@ def init_db():
     # 简易认证默认设置
     cur.execute("INSERT OR IGNORE INTO settings(key, value) VALUES('auth_mode', 'off')")
     cur.execute("INSERT OR IGNORE INTO settings(key, value) VALUES('auth_password_hash', '')")
+    # 全局语言设置，默认中文
+    cur.execute("INSERT OR IGNORE INTO settings(key, value) VALUES('language', 'zh')")
     conn.commit()
     conn.close()
 
@@ -187,6 +190,8 @@ def migrate_schema():
         # ensure auth settings keys exist
         cur.execute("INSERT OR IGNORE INTO settings(key, value) VALUES('auth_mode', 'off')")
         cur.execute("INSERT OR IGNORE INTO settings(key, value) VALUES('auth_password_hash', '')")
+        # ensure language setting exists
+        cur.execute("INSERT OR IGNORE INTO settings(key, value) VALUES('language', 'zh')")
         conn.commit()
     except Exception:
         # ignore migration failures to avoid blocking the app
@@ -205,6 +210,261 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret')
 # Jinja 过滤器：JSON 反序列化
 app.jinja_env.filters['loads'] = json.loads
+
+# === 简易国际化（无第三方依赖） ===
+# 通过 settings 表中的 key=language 控制全局语言，默认 zh。
+# 在模板中使用 {{ t('中文文案') }} 进行翻译；未命中时回退原文。
+LANG_DEFAULT = 'zh'
+TRANSLATIONS = {
+    'en': {
+        # 通用 / 导航
+        '提示词管理': 'Prompt Manager',
+        '设置': 'Settings',
+        '切换主题': 'Toggle Theme',
+        '返回': 'Back',
+        '取消': 'Cancel',
+        '保存': 'Save',
+        'Prompt 管理器': 'Prompt Manager',
+        '列表': 'List',
+        '详情': 'Details',
+        '首页': 'Home',
+
+        # 设置页
+        '系统设置': 'System Settings',
+        '管理您的提示词库配置': 'Manage your prompt library configuration',
+        '版本历史清理': 'Version History Cleanup',
+        '每个提示词仅保留最近 N 个版本，超出将自动清理（默认 200）。': 'Keep only the latest N versions per prompt. Older versions beyond this limit are auto-pruned (default 200).',
+        '清理阈值 N': 'Cleanup threshold N',
+        '个版本': 'versions',
+        '访问密码': 'Access Password',
+        '三选一：关闭（不需要密码）、指定提示词密码（仅对勾选了“需要密码”的提示词生效）、全局密码（访问本站任意页面需要密码）。': 'Choose one: Off (no password), Per-prompt password (only for prompts marked "Require password"), or Global password (require password for any page).',
+        '密码模式': 'Password mode',
+        '关闭': 'Off',
+        '指定提示词密码': 'Per-prompt password',
+        '全局密码': 'Global password',
+        '设置/修改密码（4-8 位）': 'Set/Change password (4–8 digits)',
+        '当前密码（已设置时必填）': 'Current password (required if already set)',
+        '新密码（留空则不修改）': 'New password (leave empty to keep)',
+        '确认新密码': 'Confirm new password',
+        '已设置密码：修改密码或切换密码模式需先验证当前密码。': 'Password set: verify current password before changing it or switching modes.',
+        '如从未设置过密码，请先设置后再开启对应模式。': 'If no password was set, set one first before enabling a mode.',
+        '数据导入 / 导出': 'Import / Export',
+        '导出数据': 'Export data',
+        '将所有提示词和版本历史导出为 JSON 格式文件': 'Export all prompts and version history as a JSON file',
+        '导出全部数据': 'Export all data',
+        '导入数据': 'Import data',
+        '导入将覆盖所有现有数据，请谨慎操作': 'Import will overwrite all existing data. Proceed with caution.',
+        '选择 JSON 文件': 'Choose JSON file',
+        '保存设置 / 执行导入': 'Save settings / Run import',
+
+        # 语言设置
+        '语言': 'Language',
+        '系统语言': 'System language',
+        '中文': 'Chinese',
+        '英文': 'English',
+
+        # Flash/消息
+        '已保存': 'Saved',
+        '未找到该提示词': 'Prompt not found',
+        '已创建提示词并保存首个版本': 'Prompt created and first version saved',
+        '提示词不存在或已被删除': 'Prompt does not exist or has been deleted',
+        '已删除提示词及其所有版本': 'Prompt and all versions deleted',
+        '删除失败，请重试': 'Deletion failed, please try again',
+        '版本不存在': 'Version not found',
+        '已从历史版本回滚并创建新版本': 'Rolled back from history and created a new version',
+        '阈值需为正整数': 'Threshold must be a positive integer',
+        '设置已保存': 'Settings saved',
+        '请先输入当前密码以修改认证设置': 'Enter current password to modify authentication settings',
+        '当前密码不正确，无法修改认证设置': 'Incorrect current password, cannot modify authentication settings',
+        '请先设置访问密码（4-8 位）': 'Please set an access password (4–8 digits) first',
+        '两次输入的密码不一致': 'Passwords do not match',
+        '密码长度需为 4-8 位': 'Password length must be 4–8 digits',
+        '已导入并覆盖所有数据': 'Imported and overwrote all data',
+        '导入失败：上传表单解析错误': 'Import failed: invalid upload form data',
+        '导入失败：JSON 格式无效': 'Import failed: invalid JSON',
+        '导入失败，请重试': 'Import failed, please try again',
+        '暂无版本': 'No versions yet',
+        '所选版本不存在': 'Selected version does not exist',
+        '已通过认证': 'Authenticated',
+        '密码不正确': 'Incorrect password',
+        '已退出登录': 'Logged out',
+        '已解锁该提示词': 'Prompt unlocked',
+
+        # 首页 index
+        '搜索（名称/来源/备注/标签/当前内容）': 'Search (name/source/notes/tags/content)',
+        '排序': 'Sort',
+        '最近修改': 'Recently updated',
+        '创建时间': 'Created time',
+        '名称 A-Z': 'Name A–Z',
+        '标签': 'Tags',
+        '应用': 'Apply',
+        '新建提示词': 'New Prompt',
+        '展开/收起筛选': 'Toggle filters',
+        '筛选侧边栏': 'Filter sidebar',
+        '筛选': 'Filters',
+        '收起筛选': 'Collapse filters',
+        '全部': 'All',
+        '暂无标签': 'No tags',
+        '来源': 'Source',
+        '未设置': 'Not set',
+        '暂无来源': 'No sources',
+        '没有符合筛选条件的结果': 'No results match the filters',
+        '调整或清空筛选条件后再试试': 'Try adjusting or clearing filters',
+        '清空筛选条件': 'Clear filters',
+        '暂无提示词': 'No prompts yet',
+        '点击"新建提示词"开始创建您的第一个提示词': 'Click "New Prompt" to create your first one',
+        '创建第一个提示词': 'Create first prompt',
+        '总计': 'Total',
+        '置顶': 'Pinned',
+        '切换布局': 'Toggle view',
+        '置顶/取消置顶': 'Pin/Unpin',
+        '来源：': 'Source: ',
+        '需要密码': 'Password required',
+        '修改：': 'Updated: ',
+        '版本：': 'Version: ',
+        '该提示词受密码保护': 'This prompt is password-protected',
+        '内容预览': 'Preview',
+        '复制预览内容': 'Copy preview',
+
+        # 详情/编辑 prompt_detail
+        '提示词编辑': 'Edit Prompt',
+        '返回列表': 'Back to list',
+        '历史版本': 'Versions',
+        '基本信息': 'Basic Info',
+        '提示词名称': 'Prompt name',
+        '输入提示词的名称': 'Enter prompt name',
+        '提示词内容': 'Prompt content',
+        '在此输入提示词的完整内容...': 'Enter full prompt content here...',
+        '字符': 'chars',
+        '复制内容': 'Copy content',
+        '自动调整大小': 'Auto-resize',
+        '清空内容': 'Clear content',
+        '高级设置': 'Advanced Settings',
+        '提示词来源': 'Prompt source',
+        '标签，用逗号分隔': 'Tags, separated by commas',
+        '颜色': 'Color',
+        '选择颜色': 'Pick color',
+        '例如 #409eff，留空不设置': 'e.g. #409eff, leave empty to unset',
+        '清除颜色': 'Clear color',
+        '用于首页卡片边框的细微彩色外圈。留空则不设置。': 'Used for a subtle colored ring on the home card border. Leave empty to skip.',
+        '备注': 'Notes',
+        '补充说明或使用注意事项': 'Additional notes or usage tips',
+        '该提示词需要密码访问': 'This prompt requires a password',
+        '已开启全局密码，单个提示词的密码设置不再生效。': 'Global password is enabled; per-prompt password no longer applies.',
+        '当前未启用“指定提示词密码”模式，本项暂不生效。': 'Per-prompt password mode is not enabled; this setting is inactive.',
+        '保存修改': 'Save changes',
+        '创建提示词': 'Create prompt',
+        '删除提示词': 'Delete prompt',
+        '保存为新版本': 'Save as new version',
+        '补丁版本 (+0.0.1)': 'Patch (+0.0.1)',
+        '次版本 (+0.1.0)': 'Minor (+0.1.0)',
+        '主版本 (+1.0.0)': 'Major (+1.0.0)',
+        '提示词预览': 'Prompt preview',
+        '保存中...': 'Saving...',
+        '确定要删除该提示词及其所有版本吗？此操作不可恢复。': 'Delete this prompt and all versions? This cannot be undone.',
+        '请输入提示词名称': 'Please enter a prompt name',
+        '请输入提示词内容': 'Please enter prompt content',
+        '未命名提示词': 'Untitled prompt',
+        '无内容': 'No content',
+        '已开启自动调整大小': 'Auto-resize enabled',
+        '没有内容可复制': 'No content to copy',
+        '复制失败，请手动选择文本复制': 'Copy failed, please select text manually',
+        '确定要清空内容吗？此操作不可撤销。': 'Clear content? This cannot be undone.',
+
+        # 历史版本 versions
+        '历史版本 -': 'Version History -',
+        '创建于': 'Created at',
+        '暂无历史版本': 'No version history',
+        '该提示词还没有保存过任何版本历史。': 'This prompt has no saved version history yet.',
+        '开始编辑并保存版本来追踪内容变化。': 'Start editing and saving versions to track changes.',
+        '返回首页': 'Back to Home',
+        '总版本数': 'Total versions',
+        '最近更新': 'Last updated',
+        '当前版本': 'Current version',
+        '选择版本对比': 'Choose versions to compare',
+        '版本历史': 'Version history',
+        '按时间倒序排列，最新的版本显示在最前面': 'Ordered by time (newest first)',
+        '查看完整版本内容': 'View full version content',
+        '查看详情': 'View details',
+        '与当前版本对比': 'Compare with current',
+        '对比差异': 'Compare differences',
+        '基于此版本内容创建新版本': 'Create a new version based on this content',
+        '恢复到此版本': 'Roll back to this version',
+        '当前使用中': 'In use',
+        '版本内容': 'Version content',
+        '复制': 'Copy',
+        '选择对比版本': 'Choose versions to compare',
+        '左侧版本：': 'Left version: ',
+        '右侧版本：': 'Right version: ',
+        '开始对比': 'Compare',
+        '版本': 'Version',
+        '版本信息不存在，请刷新页面重试': 'Version not found, please refresh and retry',
+        '页面加载错误，请刷新页面重试': 'Page load error, please refresh and retry',
+        '请选择要对比的版本': 'Please select versions to compare',
+        '请选择两个不同的版本进行对比': 'Please select two different versions',
+        '未知': 'Unknown',
+        '确定要回滚到版本 {version} 吗？': 'Confirm rollback to version {version}?',
+        '📝 回滚说明：': 'Notes:',
+        '• 这将基于版本 {version} 的内容创建一个新版本': '• A new version will be created based on version {version}\'s content',
+        '• 当前版本 {current} 不会被删除': '• Current version {current} will not be deleted',
+        '• 新版本号将在当前版本基础上递增': '• The new version number will be incremented from current version',
+        '• 所有版本历史都会保留': '• All version history will be kept',
+        '此操作不可撤销，是否继续？': 'This action cannot be undone. Continue?',
+        '操作失败，请刷新页面重试': 'Operation failed, please refresh and retry',
+
+        # Diff 页面
+        '版本对比': 'Compare Versions',
+        '返回编辑': 'Back to edit',
+        '左（旧）': 'Left (old)',
+        '右（新）': 'Right (new)',
+        '模式': 'Mode',
+        '词级': 'Word-level',
+        '行级': 'Line-level',
+        '刷新': 'Refresh',
+        '旧版本：': 'Old: ',
+        '新版本：': 'New: ',
+
+        # Auth 页面
+        '安全验证': 'Security Check',
+        '访问验证': 'Access Verification',
+        '解锁提示词': 'Unlock Prompt',
+        '请输入访问密码以进入站点': 'Enter password to access the site',
+        '该提示词已启用密码保护，请输入密码解锁': 'This prompt is password-protected; enter password to unlock',
+        '提示词': 'Prompt',
+        '访问密码（4-8 位）': 'Access password (4–8 digits)',
+        '请输入密码': 'Enter password',
+        '进入': 'Enter',
+        '解锁': 'Unlock',
+    }
+}
+
+
+def _get_language():
+    """读取全局语言设置（zh|en），默认 zh。"""
+    try:
+        conn = get_db()
+        lang = get_setting(conn, 'language', LANG_DEFAULT) or LANG_DEFAULT
+        conn.close()
+        return 'en' if lang.lower() == 'en' else 'zh'
+    except Exception:
+        return LANG_DEFAULT
+
+
+@app.context_processor
+def inject_i18n():
+    lang = _get_language()
+
+    def t(s: object) -> str:
+        text = '' if s is None else str(s)
+        if lang == 'en':
+            return TRANSLATIONS.get('en', {}).get(text, text)
+        return text
+
+    return {
+        't': t,
+        'lang': lang,
+        'lang_html': 'en' if lang == 'en' else 'zh-CN',
+    }
 
 
 def sanitize_color(val):
@@ -527,6 +787,13 @@ def rollback_version(prompt_id, version_id):
 def settings():
     conn = get_db()
     if request.method == 'POST':
+        # 强制在受控块中解析表单，捕获解析异常，避免返回 400
+        try:
+            _ = request.form
+        except BadRequest:
+            flash('导入失败：上传表单解析错误', 'error')
+            conn.close()
+            return redirect(url_for('settings'))
         threshold = request.form.get('version_cleanup_threshold', '200').strip()
         if not threshold.isdigit() or int(threshold) < 1:
             flash('阈值需为正整数', 'error')
@@ -534,6 +801,12 @@ def settings():
             set_setting(conn, 'version_cleanup_threshold', threshold)
             conn.commit()
             flash('设置已保存', 'success')
+        # 语言设置
+        language = (request.form.get('language') or 'zh').lower()
+        if language not in ('zh', 'en'):
+            language = 'zh'
+        set_setting(conn, 'language', language)
+        conn.commit()
         # 访问密码：模式 + 修改密码
         mode = request.form.get('auth_mode', 'off')
         if mode not in ('off', 'per', 'global'):
@@ -574,59 +847,71 @@ def settings():
                     set_setting(conn, 'auth_password_hash', hash_pw(new_pw))
         set_setting(conn, 'auth_mode', mode_to_set)
         conn.commit()
-        # 导入
-        if 'import_file' in request.files and request.files['import_file']:
-            f = request.files['import_file']
-            data = json.load(f.stream)
-            # 覆盖所有数据
-            cur = conn.cursor()
-            cur.execute("DELETE FROM versions")
-            cur.execute("DELETE FROM prompts")
-            # 可包含 settings
-            if isinstance(data, dict) and 'prompts' in data:
-                prompts = data['prompts']
-            else:
-                prompts = data
-            for p in prompts:
-                cur.execute(
-                    "INSERT INTO prompts(id, name, source, notes, color, tags, pinned, created_at, updated_at, current_version_id, require_password) VALUES(?,?,?,?,?,?,?,?,?,NULL,?)",
-                    (
-                        p.get('id'),
-                        p.get('name'),
-                        p.get('source'),
-                        p.get('notes'),
-                        sanitize_color(p.get('color')),
-                        json.dumps(p.get('tags') or [], ensure_ascii=False),
-                        1 if p.get('pinned') else 0,
-                        p.get('created_at') or now_ts(),
-                        p.get('updated_at') or now_ts(),
-                        1 if p.get('require_password') else 0,
-                    )
-                )
-                pid = cur.lastrowid if p.get('id') is None else p.get('id')
-                for v in (p.get('versions') or []):
-                    cur.execute(
-                        "INSERT INTO versions(id, prompt_id, version, content, created_at, parent_version_id) VALUES(?,?,?,?,?,?)",
-                        (
-                            v.get('id'),
-                            pid,
-                            v.get('version'),
-                            v.get('content') or '',
-                            v.get('created_at') or now_ts(),
-                            v.get('parent_version_id'),
+        # 导入（健壮性：捕获表单/JSON 解析异常，避免 400）
+        try:
+            files = request.files
+        except BadRequest:
+            # multipart 解析失败
+            flash('导入失败：上传表单解析错误', 'error')
+        else:
+            if 'import_file' in files and files['import_file']:
+                try:
+                    f = files['import_file']
+                    data = json.load(f.stream)
+                    # 覆盖所有数据
+                    cur = conn.cursor()
+                    cur.execute("DELETE FROM versions")
+                    cur.execute("DELETE FROM prompts")
+                    # 可包含 settings
+                    if isinstance(data, dict) and 'prompts' in data:
+                        prompts = data['prompts']
+                    else:
+                        prompts = data
+                    for p in prompts:
+                        cur.execute(
+                            "INSERT INTO prompts(id, name, source, notes, color, tags, pinned, created_at, updated_at, current_version_id, require_password) VALUES(?,?,?,?,?,?,?,?,?,NULL,?)",
+                            (
+                                p.get('id'),
+                                p.get('name'),
+                                p.get('source'),
+                                p.get('notes'),
+                                sanitize_color(p.get('color')),
+                                json.dumps(p.get('tags') or [], ensure_ascii=False),
+                                1 if p.get('pinned') else 0,
+                                p.get('created_at') or now_ts(),
+                                p.get('updated_at') or now_ts(),
+                                1 if p.get('require_password') else 0,
+                            )
                         )
-                    )
-                compute_current_version(conn, pid)
-            conn.commit()
-            flash('已导入并覆盖所有数据', 'success')
+                        pid = cur.lastrowid if p.get('id') is None else p.get('id')
+                        for v in (p.get('versions') or []):
+                            cur.execute(
+                                "INSERT INTO versions(id, prompt_id, version, content, created_at, parent_version_id) VALUES(?,?,?,?,?,?)",
+                                (
+                                    v.get('id'),
+                                    pid,
+                                    v.get('version'),
+                                    v.get('content') or '',
+                                    v.get('created_at') or now_ts(),
+                                    v.get('parent_version_id'),
+                                )
+                            )
+                        compute_current_version(conn, pid)
+                    conn.commit()
+                    flash('已导入并覆盖所有数据', 'success')
+                except json.JSONDecodeError:
+                    flash('导入失败：JSON 格式无效', 'error')
+                except Exception:
+                    flash('导入失败，请重试', 'error')
         conn.close()
         return redirect(url_for('settings'))
 
     threshold = get_setting(conn, 'version_cleanup_threshold', '200')
     auth_mode = get_setting(conn, 'auth_mode', 'off') or 'off'
     has_password = bool(get_setting(conn, 'auth_password_hash', '') or '')
+    language = get_setting(conn, 'language', LANG_DEFAULT) or LANG_DEFAULT
     conn.close()
-    return render_template('settings.html', threshold=threshold, auth_mode=auth_mode, has_password=has_password)
+    return render_template('settings.html', threshold=threshold, auth_mode=auth_mode, has_password=has_password, language=language)
 
 
 @app.route('/export')

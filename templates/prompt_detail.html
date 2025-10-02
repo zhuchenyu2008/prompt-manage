@@ -1,5 +1,5 @@
 {% extends 'layout.html' %}
-{% block title %}详情 - Prompt 管理器{% endblock %}
+{% block title %}{{ t('详情') }} - {{ t('Prompt 管理器') }}{% endblock %}
 {% block content %}
   <div class="page-header">
     <h1 class="page-title">
@@ -7,7 +7,7 @@
       {% if prompt %}
         {{ prompt['name'] }}
       {% else %}
-        提示词编辑
+        {{ t('提示词编辑') }}
       {% endif %}
     </h1>
   </div>
@@ -15,11 +15,11 @@
   <div class="prompt-editor-container">
     <div class="breadcrumb-nav">
       <a class="btn ghost" href="{{ url_for('index') }}">
-        <i class="fas fa-arrow-left"></i> 返回列表
+        <i class="fas fa-arrow-left"></i> {{ t('返回列表') }}
       </a>
       {% if prompt %}
         <a class="btn ghost" href="{{ url_for('versions_page', prompt_id=prompt['id']) }}">
-          <i class="fas fa-history"></i> 历史版本
+          <i class="fas fa-history"></i> {{ t('历史版本') }}
         </a>
       {% endif %}
     </div>
@@ -30,38 +30,38 @@
         <div class="form-section primary-section">
           <div class="section-header">
             <i class="fas fa-info-circle"></i>
-            <h3>基本信息</h3>
+            <h3>{{ t('基本信息') }}</h3>
           </div>
           <div class="section-content">
             <div class="form-group">
               <label for="name">
                 <i class="fas fa-heading"></i>
-                提示词名称
+                {{ t('提示词名称') }}
                 <span class="required">*</span>
               </label>
               <input type="text" id="name" name="name" value="{{ (prompt and prompt['name']) or '' }}" 
-                     placeholder="输入提示词的名称" required />
+                     placeholder="{{ t('输入提示词的名称') }}" required />
               </div>
 
             <div class="form-group">
               <label for="content">
                 <i class="fas fa-file-alt"></i>
-                提示词内容
+                {{ t('提示词内容') }}
                 <span class="required">*</span>
               </label>
               <div class="textarea-wrapper">
                 <textarea id="content" name="content" rows="16" 
-                          placeholder="在此输入提示词的完整内容...">{{ (current and current['content']) or '' }}</textarea>
+                          placeholder="{{ t('在此输入提示词的完整内容...') }}">{{ (current and current['content']) or '' }}</textarea>
                 <div class="textarea-footer">
-                  <div class="char-counter">0 字符</div>
+                  <div class="char-counter">0 {{ t('字符') }}</div>
                   <div class="textarea-actions">
-                    <button type="button" class="icon-btn" id="copyBtn" title="复制内容">
+                    <button type="button" class="icon-btn" id="copyBtn" title="{{ t('复制内容') }}">
                       <i class="fas fa-copy"></i>
                     </button>
-                    <button type="button" class="icon-btn" id="resizeBtn" title="自动调整大小">
+                    <button type="button" class="icon-btn" id="resizeBtn" title="{{ t('自动调整大小') }}">
                       <i class="fas fa-expand-alt"></i>
                     </button>
-                    <button type="button" class="icon-btn" id="clearBtn" title="清空内容">
+                    <button type="button" class="icon-btn" id="clearBtn" title="{{ t('清空内容') }}">
                       <i class="fas fa-eraser"></i>
                     </button>
                   </div>
@@ -75,7 +75,7 @@
         <div class="form-section">
           <div class="section-header collapsible" onclick="toggleSection(this)">
             <i class="fas fa-cog"></i>
-            <h3>高级设置</h3>
+            <h3>{{ t('高级设置') }}</h3>
             <i class="fas fa-chevron-down section-toggle"></i>
           </div>
           <div class="section-content">
@@ -83,53 +83,53 @@
               <div class="form-group">
                 <label for="source">
                   <i class="fas fa-link"></i>
-                  来源
+                  {{ t('来源') }}
                 </label>
                 <input type="text" id="source" name="source" value="{{ (prompt and prompt['source']) or '' }}" 
-                       placeholder="提示词来源" />
+                       placeholder="{{ t('提示词来源') }}" />
                 </div>
 
               <div class="form-group">
                 <label for="tags">
                   <i class="fas fa-tags"></i>
-                  标签
+                  {{ t('标签') }}
                 </label>
                 <div class="tags-input-wrapper">
                   <input type="text" id="tags" name="tags" 
                          value="{% if prompt and prompt['tags'] %}{{ (prompt['tags']|loads)|join(', ') }}{% endif %}" 
-                         placeholder="标签，用逗号分隔" />
+                         placeholder="{{ t('标签，用逗号分隔') }}" />
                   </div>
               </div>
 
               <div class="form-group">
                 <label for="color">
                   <i class="fas fa-palette"></i>
-                  颜色
+                  {{ t('颜色') }}
                 </label>
                 <div class="color-input">
                   <div class="color-input-row">
                     <div class="color-swatch-wrap">
-                      <span class="color-swatch" id="colorSwatch" title="选择颜色" role="button" tabindex="0" aria-label="选择颜色"></span>
-                      <input type="color" id="colorPicker" aria-label="选择颜色"
+                      <span class="color-swatch" id="colorSwatch" title="{{ t('选择颜色') }}" role="button" tabindex="0" aria-label="{{ t('选择颜色') }}"></span>
+                      <input type="color" id="colorPicker" aria-label="{{ t('选择颜色') }}"
                              value="{{ (prompt and prompt['color']) or '#409eff' }}" />
                     </div>
                     <input type="text" id="color" name="color" value="{{ (prompt and prompt['color']) or '' }}" 
-                           placeholder="例如 #409eff，留空不设置" />
-                    <button type="button" class="icon-btn" id="colorClearBtn" title="清除颜色">
+                           placeholder="{{ t('例如 #409eff，留空不设置') }}" />
+                    <button type="button" class="icon-btn" id="colorClearBtn" title="{{ t('清除颜色') }}">
                       <i class="fas fa-eraser"></i>
                     </button>
                   </div>
-                  <div class="input-help">用于首页卡片边框的细微彩色外圈。留空则不设置。</div>
+                  <div class="input-help">{{ t('用于首页卡片边框的细微彩色外圈。留空则不设置。') }}</div>
                 </div>
               </div>
 
               <div class="form-group">
                 <label for="notes">
                   <i class="fas fa-sticky-note"></i>
-                  备注
+                  {{ t('备注') }}
                 </label>
                 <input type="text" id="notes" name="notes" value="{{ (prompt and prompt['notes']) or '' }}" 
-                       placeholder="补充说明或使用注意事项" />
+                       placeholder="{{ t('补充说明或使用注意事项') }}" />
                   </div>
             </div>
 
@@ -141,13 +141,13 @@
                 <span class="checkbox-custom"></span>
                 <span class="checkbox-text">
                   <i class="fas fa-lock"></i>
-                  该提示词需要密码访问
+                  {{ t('该提示词需要密码访问') }}
                 </span>
               </label>
               {% if auth_mode == 'global' %}
-                <div class="input-help">已开启全局密码，单个提示词的密码设置不再生效。</div>
+                <div class="input-help">{{ t('已开启全局密码，单个提示词的密码设置不再生效。') }}</div>
               {% elif auth_mode == 'off' %}
-                <div class="input-help">当前未启用“指定提示词密码”模式，本项暂不生效。</div>
+                <div class="input-help">{{ t('当前未启用“指定提示词密码”模式，本项暂不生效。') }}</div>
               {% endif %}
             </div>
           </div>
@@ -160,20 +160,20 @@
           <button type="submit" class="btn primary">
             <i class="fas fa-check"></i>
             {% if prompt %}
-              保存修改
+              {{ t('保存修改') }}
             {% else %}
-              创建提示词
+              {{ t('创建提示词') }}
             {% endif %}
           </button>
           
           <a href="{{ url_for('index') }}" class="btn ghost">
             <i class="fas fa-arrow-left"></i>
-            返回列表
+            {{ t('返回列表') }}
           </a>
           {% if prompt %}
             <button type="button" class="btn ghost" onclick="triggerDelete()" style="border-color: var(--del); color: var(--del);">
               <i class="fas fa-trash"></i>
-              删除提示词
+              {{ t('删除提示词') }}
             </button>
           {% endif %}
         </div>
@@ -185,7 +185,7 @@
               <span class="checkbox-custom"></span>
               <span class="checkbox-text">
                 <i class="fas fa-save"></i>
-                保存为新版本
+                {{ t('保存为新版本') }}
               </span>
             </label>
           </div>
@@ -193,13 +193,13 @@
           <div class="version-select-wrapper">
             <select id="bump_kind" name="bump_kind" class="version-select">
               <option value="patch" selected>
-                补丁版本 (+0.0.1)
+                {{ t('补丁版本 (+0.0.1)') }}
               </option>
               <option value="minor">
-                次版本 (+0.1.0)
+                {{ t('次版本 (+0.1.0)') }}
               </option>
               <option value="major">
-                主版本 (+1.0.0)
+                {{ t('主版本 (+1.0.0)') }}
               </option>
             </select>
           </div>
@@ -212,7 +212,7 @@
   <div id="previewModal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3><i class="fas fa-eye"></i> 提示词预览</h3>
+        <h3><i class="fas fa-eye"></i> {{ t('提示词预览') }}</h3>
         <button class="modal-close" onclick="closePreview()">&times;</button>
       </div>
       <div class="modal-body">
@@ -796,6 +796,21 @@
   </style>
 
   <script>
+    // i18n strings for this page
+    const I18N = {
+      SAVE_PROCESSING: {{ t('保存中...')|tojson }},
+      CONFIRM_DELETE: {{ t('确定要删除该提示词及其所有版本吗？此操作不可恢复。')|tojson }},
+      CHAR: {{ t('字符')|tojson }},
+      ENTER_NAME: {{ t('请输入提示词名称')|tojson }},
+      ENTER_CONTENT: {{ t('请输入提示词内容')|tojson }},
+      UNTITLED: {{ t('未命名提示词')|tojson }},
+      NO_CONTENT: {{ t('无内容')|tojson }},
+      AUTOSIZE_ON: {{ t('已开启自动调整大小')|tojson }},
+      AUTOSIZE_OFF: {{ t('自动调整大小')|tojson }},
+      NO_COPY_SOURCE: {{ t('没有内容可复制')|tojson }},
+      COPY_FAIL: {{ t('复制失败，请手动选择文本复制')|tojson }},
+      CLEAR_CONFIRM: {{ t('确定要清空内容吗？此操作不可撤销。')|tojson }}
+    };
     // Auto-resize toggle state (default: off)
     let autoResizeEnabled = false;
 
@@ -839,7 +854,7 @@
         
         // Show loading state
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="loading"></span> 保存中...';
+        submitBtn.innerHTML = '<span class="loading"></span> ' + I18N.SAVE_PROCESSING;
         
         // Re-enable after 5 seconds (fallback)
         setTimeout(() => {
@@ -851,7 +866,7 @@
 
     // 删除确认：仅一次确认
     function confirmDelete() {
-      return confirm('确定要删除该提示词及其所有版本吗？此操作不可恢复。');
+      return confirm(I18N.CONFIRM_DELETE);
     }
 
     function triggerDelete() {
@@ -870,7 +885,7 @@
       const counter = document.querySelector('.char-counter');
       if (counter) {
         const length = textarea.value.length;
-        counter.textContent = `${length} 字符`;
+        counter.textContent = `${length} ` + I18N.CHAR;
         
         // Change color based on length
         if (length > 2000) {
@@ -1012,7 +1027,7 @@
       
       // Validate name
       if (!nameInput.value.trim()) {
-        showFieldError(nameInput, '请输入提示词名称');
+        showFieldError(nameInput, I18N.ENTER_NAME);
         isValid = false;
       } else {
         clearFieldError(nameInput);
@@ -1020,7 +1035,7 @@
       
       // Validate content
       if (!contentInput.value.trim()) {
-        showFieldError(contentInput, '请输入提示词内容');
+        showFieldError(contentInput, I18N.ENTER_CONTENT);
         isValid = false;
       } else {
         clearFieldError(contentInput);
@@ -1062,8 +1077,8 @@
     }
     
     function previewPrompt() {
-      const name = document.getElementById('name').value || '未命名提示词';
-      const content = document.getElementById('content').value || '无内容';
+      const name = document.getElementById('name').value || I18N.UNTITLED;
+      const content = document.getElementById('content').value || I18N.NO_CONTENT;
       
       document.getElementById('previewName').textContent = name;
       document.getElementById('previewText').textContent = content;
@@ -1124,10 +1139,10 @@
       autoResizeEnabled = !autoResizeEnabled;
       if (autoResizeEnabled) {
         autoResizeTextarea(textarea);
-        document.getElementById('resizeBtn').title = '已开启自动调整大小';
+        document.getElementById('resizeBtn').title = I18N.AUTOSIZE_ON;
       } else {
         textarea.style.height = '';
-        document.getElementById('resizeBtn').title = '自动调整大小';
+        document.getElementById('resizeBtn').title = I18N.AUTOSIZE_OFF;
       }
     });
     
@@ -1136,7 +1151,7 @@
       const content = textarea.value.trim();
       
       if (!content) {
-        showFieldError(textarea, '没有内容可复制');
+        showFieldError(textarea, I18N.NO_COPY_SOURCE);
         return;
       }
       
@@ -1201,14 +1216,14 @@
         }
       } catch (err) {
         console.error('Fallback copy failed:', err);
-        alert('复制失败，请手动选择文本复制');
+        alert(I18N.COPY_FAIL);
       }
       
       document.body.removeChild(textArea);
     }
     
     document.getElementById('clearBtn')?.addEventListener('click', () => {
-      if (confirm('确定要清空内容吗？此操作不可撤销。')) {
+      if (confirm(I18N.CLEAR_CONFIRM)) {
         document.getElementById('content').value = '';
         updateCharCounter(document.getElementById('content'));
         document.getElementById('content').focus();

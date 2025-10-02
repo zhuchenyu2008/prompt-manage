@@ -1,21 +1,21 @@
 {% extends 'layout.html' %}
-{% block title %}列表 - Prompt 管理器{% endblock %}
+{% block title %}{{ t('列表') }} - {{ t('Prompt 管理器') }}{% endblock %}
 {% block content %}
   <section class="toolbar">
     <form method="get" action="{{ url_for('index') }}" class="search-form">
       <div class="search-input-wrapper">
         <i class="fas fa-search"></i>
-        <input type="text" name="q" value="{{ q }}" placeholder="搜索（名称/来源/备注/标签/当前内容）" />
+        <input type="text" name="q" value="{{ q }}" placeholder="{{ t('搜索（名称/来源/备注/标签/当前内容）') }}" />
       </div>
       <div class="search-controls">
-        <select name="sort" title="排序" class="sort-select">
-          <option value="updated" {% if sort=='updated' %}selected{% endif %}>最近修改</option>
-          <option value="created" {% if sort=='created' %}selected{% endif %}>创建时间</option>
-          <option value="name" {% if sort=='name' %}selected{% endif %}>名称 A-Z</option>
-          <option value="tags" {% if sort=='tags' %}selected{% endif %}>标签</option>
+        <select name="sort" title="{{ t('排序') }}" class="sort-select">
+          <option value="updated" {% if sort=='updated' %}selected{% endif %}>{{ t('最近修改') }}</option>
+          <option value="created" {% if sort=='created' %}selected{% endif %}>{{ t('创建时间') }}</option>
+          <option value="name" {% if sort=='name' %}selected{% endif %}>{{ t('名称 A-Z') }}</option>
+          <option value="tags" {% if sort=='tags' %}selected{% endif %}>{{ t('标签') }}</option>
         </select>
         <button class="btn search-btn" type="submit">
-          <i class="fas fa-filter"></i> 应用
+          <i class="fas fa-filter"></i> {{ t('应用') }}
         </button>
       </div>
     </form>
@@ -24,22 +24,22 @@
   <section class="create-section">
     <div class="create-actions">
       <a href="{{ url_for('new_prompt') }}" class="btn primary create-btn">
-        <i class="fas fa-plus"></i> 新建提示词
+        <i class="fas fa-plus"></i> {{ t('新建提示词') }}
       </a>
     </div>
   </section>
 
   <!-- 桌面端覆盖式侧边栏 + 固定开关按钮（不挤压内容） - 始终渲染，便于空结果时也能操作筛选 -->
-  <button id="sidebarToggle" class="icon-btn small drawer-toggle" title="展开/收起筛选" aria-label="展开/收起筛选">
+  <button id="sidebarToggle" class="icon-btn small drawer-toggle" title="{{ t('展开/收起筛选') }}" aria-label="{{ t('展开/收起筛选') }}">
     <i class="fas fa-angle-right"></i>
   </button>
-  <aside id="sidebarPanel" class="drawer" data-open="false" aria-hidden="true" aria-label="筛选侧边栏">
+  <aside id="sidebarPanel" class="drawer" data-open="false" aria-hidden="true" aria-label="{{ t('筛选侧边栏') }}">
     <div class="drawer-header">
       <div class="drawer-title">
         <i class="fas fa-sliders"></i>
-        <span>筛选</span>
+        <span>{{ t('筛选') }}</span>
       </div>
-      <button id="drawerCloseBtn" class="icon-btn small drawer-close" title="收起筛选" aria-label="收起筛选" style="display:none">
+      <button id="drawerCloseBtn" class="icon-btn small drawer-close" title="{{ t('收起筛选') }}" aria-label="{{ t('收起筛选') }}" style="display:none">
         <i class="fas fa-angle-left"></i>
       </button>
     </div>
@@ -47,8 +47,8 @@
     <div class="drawer-section">
       <div class="section-title">
         <i class="fas fa-tags"></i>
-        <span>标签</span>
-        <button class="link-btn reset-btn" data-reset="tags">全部</button>
+        <span>{{ t('标签') }}</span>
+        <button class="link-btn reset-btn" data-reset="tags">{{ t('全部') }}</button>
       </div>
       <div class="facet-list">
         {% if tag_counts and tag_counts|length > 0 %}
@@ -60,7 +60,7 @@
             </label>
           {% endfor %}
         {% else %}
-          <div class="facet-empty">暂无标签</div>
+          <div class="facet-empty">{{ t('暂无标签') }}</div>
         {% endif %}
       </div>
     </div>
@@ -68,20 +68,20 @@
     <div class="drawer-section">
       <div class="section-title">
         <i class="fas fa-database"></i>
-        <span>来源</span>
-        <button class="link-btn reset-btn" data-reset="sources">全部</button>
+        <span>{{ t('来源') }}</span>
+        <button class="link-btn reset-btn" data-reset="sources">{{ t('全部') }}</button>
       </div>
       <div class="facet-list">
         {% if source_counts and source_counts|length > 0 %}
           {% for src, cnt in source_counts|dictsort(by='value', reverse=True) %}
             <label class="facet-item">
               <input type="checkbox" name="fsrc" value="{{ src }}" {% if src in selected_sources %}checked{% endif %}>
-              <span class="facet-label" title="{{ '未设置' if src=='(empty)' else src }}">{{ '未设置' if src=='(empty)' else src }}</span>
+              <span class="facet-label" title="{{ t('未设置') if src=='(empty)' else src }}">{{ t('未设置') if src=='(empty)' else src }}</span>
               <span class="facet-count">{{ cnt }}</span>
             </label>
           {% endfor %}
         {% else %}
-          <div class="facet-empty">暂无来源</div>
+          <div class="facet-empty">{{ t('暂无来源') }}</div>
         {% endif %}
       </div>
     </div>
@@ -95,16 +95,16 @@
           <i class="fas fa-inbox"></i>
         </div>
         {% if has_filters %}
-          <h3 class="empty-title">没有符合筛选条件的结果</h3>
-          <p class="empty-description">调整或清空筛选条件后再试试</p>
+          <h3 class="empty-title">{{ t('没有符合筛选条件的结果') }}</h3>
+          <p class="empty-description">{{ t('调整或清空筛选条件后再试试') }}</p>
           <button class="btn" id="clearFiltersBtn" type="button">
-            <i class="fas fa-eraser"></i> 清空筛选条件
+            <i class="fas fa-eraser"></i> {{ t('清空筛选条件') }}
           </button>
         {% else %}
-          <h3 class="empty-title">暂无提示词</h3>
-          <p class="empty-description">点击"新建提示词"开始创建您的第一个提示词</p>
+          <h3 class="empty-title">{{ t('暂无提示词') }}</h3>
+          <p class="empty-description">{{ t('点击"新建提示词"开始创建您的第一个提示词') }}</p>
           <a href="{{ url_for('new_prompt') }}" class="btn primary">
-            <i class="fas fa-plus"></i> 创建第一个提示词
+            <i class="fas fa-plus"></i> {{ t('创建第一个提示词') }}
           </a>
         {% endif %}
       </div>
@@ -112,23 +112,23 @@
       <div class="stats-bar">
         <div class="stat-item">
           <i class="fas fa-file-alt"></i>
-          <span class="stat-label">总计</span>
+          <span class="stat-label">{{ t('总计') }}</span>
           <span class="stat-value">{{ prompts|length }}</span>
         </div>
         <div class="stat-item">
           <i class="fas fa-star"></i>
-          <span class="stat-label">置顶</span>
+          <span class="stat-label">{{ t('置顶') }}</span>
           <span class="stat-value">{{ prompts|selectattr('pinned')|list|length }}</span>
         </div>
         <div class="stat-item">
           <i class="fas fa-tag"></i>
-          <span class="stat-label">标签</span>
+          <span class="stat-label">{{ t('标签') }}</span>
           <span class="stat-value">{{ tag_suggestions|length }}</span>
         </div>
       </div>
 
       <!-- 视图切换（桌面端） -->
-      <div class="view-toggle" title="切换布局" aria-label="切换布局">
+      <div class="view-toggle" title="{{ t('切换布局') }}" aria-label="{{ t('切换布局') }}">
         <button id="viewModeToggle" class="icon-btn small" aria-pressed="false">
           <i class="fas fa-table-cells"></i>
         </button>
@@ -146,7 +146,7 @@
                 </a>
                 <div class="card-actions">
                   <form method="post" action="{{ url_for('toggle_pin', prompt_id=p['id']) }}" class="inline-form">
-                    <button class="icon-btn" title="置顶/取消置顶" aria-label="置顶" type="submit">
+                    <button class="icon-btn" title="{{ t('置顶/取消置顶') }}" aria-label="{{ t('置顶') }}" type="submit">
                       {% if p['pinned'] %}
                         <i class="fas fa-star" style="color: var(--star);"></i>
                       {% else %}
@@ -161,23 +161,23 @@
                 {% if is_locked %}
                   <div class="meta-item">
                     <i class="fas fa-link"></i>
-                    <span class="meta-label">来源：</span>
-                    <span class="meta-value">需要密码</span>
+                    <span class="meta-label">{{ t('来源：') }}</span>
+                    <span class="meta-value">{{ t('需要密码') }}</span>
                   </div>
                 {% else %}
                   <div class="meta-item">
                     <i class="fas fa-link"></i>
-                    <span class="meta-label">来源：</span>
+                    <span class="meta-label">{{ t('来源：') }}</span>
                     <span class="meta-value">{{ p['source'] or '—' }}</span>
                   </div>
                   <div class="meta-item">
                     <i class="fas fa-clock"></i>
-                    <span class="meta-label">修改：</span>
+                    <span class="meta-label">{{ t('修改：') }}</span>
                     <span class="meta-value">{{ (p['updated_at'] or '')[:19].replace('T',' ') }}</span>
                   </div>
                   <div class="meta-item">
                     <i class="fas fa-code-branch"></i>
-                    <span class="meta-label">版本：</span>
+                    <span class="meta-label">{{ t('版本：') }}</span>
                     <span class="meta-value">{{ p['current_version'] or '—' }}</span>
                   </div>
                 {% endif %}
@@ -185,7 +185,7 @@
               {% if is_locked %}
               <div class="meta-item" style="margin-top: var(--spacing-sm); color: var(--muted);">
                 <i class="fas fa-lock"></i>
-                <span class="meta-label">该提示词受密码保护</span>
+                <span class="meta-label">{{ t('该提示词受密码保护') }}</span>
               </div>
               {% endif %}
             </div>
@@ -214,9 +214,9 @@
                 <div class="preview-header">
                   <div class="preview-title">
                     <i class="fas fa-eye"></i>
-                    <span>内容预览</span>
+                    <span>{{ t('内容预览') }}</span>
                   </div>
-                  <button class="copy-preview-btn" onclick="copyPreviewContent(this)" data-content="{{ p['current_content']|e }}" title="复制预览内容">
+                  <button class="copy-preview-btn" onclick="copyPreviewContent(this)" data-content="{{ p['current_content']|e }}" title="{{ t('复制预览内容') }}">
                     <i class="fas fa-copy"></i>
                   </button>
                 </div>

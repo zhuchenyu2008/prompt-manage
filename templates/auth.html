@@ -1,16 +1,16 @@
 {% extends 'layout.html' %}
-{% block title %}安全验证 - Prompt 管理器{% endblock %}
+{% block title %}{{ t('安全验证') }} - {{ t('Prompt 管理器') }}{% endblock %}
 {% block content %}
   <div class="page-header" style="text-align:center;">
     <h1 class="page-title">
       <i class="fas fa-lock"></i>
-      {% if action == 'login' %}访问验证{% else %}解锁提示词{% endif %}
+      {% if action == 'login' %}{{ t('访问验证') }}{% else %}{{ t('解锁提示词') }}{% endif %}
     </h1>
     <p class="page-subtitle">
       {% if action == 'login' %}
-        请输入访问密码以进入站点
+        {{ t('请输入访问密码以进入站点') }}
       {% else %}
-        该提示词已启用密码保护，请输入密码解锁
+        {{ t('该提示词已启用密码保护，请输入密码解锁') }}
       {% endif %}
     </p>
   </div>
@@ -21,7 +21,7 @@
       <div class="form-group" style="margin-bottom: var(--spacing-lg);">
         <label style="display:flex; align-items:center; gap:8px; font-weight:600;">
           <i class="fas fa-file-alt" style="color:var(--primary);"></i>
-          提示词
+          {{ t('提示词') }}
         </label>
         <div style="padding: 10px 12px; border:1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); color: var(--fg);">
           {{ prompt['name'] or ('#' ~ prompt['id']) }}
@@ -32,20 +32,19 @@
       <div class="form-group">
         <label for="password" style="display:flex; align-items:center; gap:8px; font-weight:600;">
           <i class="fas fa-key" style="color:var(--primary);"></i>
-          访问密码（4-8 位）
+          {{ t('访问密码（4-8 位）') }}
         </label>
-        <input type="password" id="password" name="password" placeholder="请输入密码" required style="width:100%; padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--bg); color:var(--fg);" />
+        <input type="password" id="password" name="password" placeholder="{{ t('请输入密码') }}" required style="width:100%; padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--bg); color:var(--fg);" />
         <input type="hidden" name="next" value="{{ next }}" />
       </div>
 
       <div class="form-actions" style="justify-content:center;">
         <button type="submit" class="btn primary" style="min-width:160px;">
           <i class="fas fa-unlock"></i>
-          {% if action == 'login' %}进入{% else %}解锁{% endif %}
+          {% if action == 'login' %}{{ t('进入') }}{% else %}{{ t('解锁') }}{% endif %}
         </button>
-        <a href="{{ url_for('index') }}" class="btn ghost">取消</a>
+        <a href="{{ url_for('index') }}" class="btn ghost">{{ t('取消') }}</a>
       </div>
     </form>
   </div>
 {% endblock %}
-
