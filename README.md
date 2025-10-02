@@ -1,8 +1,10 @@
-# Prompt 管理器
+# Prompt 管理器 （Prompt Manager）
 
 语言: 简体中文 | [English](README.en.md)
 
 一个功能完整的本地提示词管理系统，支持版本控制、搜索、标签管理、导入导出功能。采用Python + Flask + SQLite 构建，无需外部依赖，开箱即用。
+
+A fully functional local prompt management system that supports version control, search, tag management, and import/export features. Built with Python + Flask + SQLite, it requires no external dependencies and works out of the box.
 
 ## ✨ 核心功能
 
