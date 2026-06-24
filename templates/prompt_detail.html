@@ -176,6 +176,20 @@
                 <div class="input-help">{{ t('当前未启用“指定提示词密码”模式，本项暂不生效。') }}</div>
               {% endif %}
             </div>
+
+            {% if save_requires_password %}
+            <div class="form-group save-password-group">
+              <label for="save_password">
+                <i class="fas fa-key"></i>
+                {{ t('访问密码') }}
+                <span class="required">*</span>
+              </label>
+              <input type="password" id="save_password" name="save_password"
+                     placeholder="{{ t('请输入密码') }}"
+                     autocomplete="current-password" required />
+              <div class="input-help">{{ t('保存修改前请确认访问密码。') }}</div>
+            </div>
+            {% endif %}
           </div>
         </div>
       </div>
@@ -987,6 +1001,7 @@
     const I18N = {
       SAVE_PROCESSING: {{ t('保存中...')|tojson }},
       DELETE_PASSWORD_REQUIRED: {{ t('访问密码不能为空')|tojson }},
+      SAVE_PASSWORD_REQUIRED: {{ t('请输入访问密码以保存修改')|tojson }},
       DELETE_CONFIRM: {{ t('确认删除')|tojson }},
       DELETE_PROCESSING: {{ t('删除中...')|tojson }},
       CHAR: {{ t('字符')|tojson }},
@@ -1274,6 +1289,7 @@
     function validateForm() {
       const nameInput = document.getElementById('name');
       const contentInput = document.getElementById('content');
+      const savePasswordInput = document.getElementById('save_password');
       
       let isValid = true;
       
@@ -1291,6 +1307,15 @@
         isValid = false;
       } else {
         clearFieldError(contentInput);
+      }
+
+      if (savePasswordInput) {
+        if (!savePasswordInput.value.trim()) {
+          showFieldError(savePasswordInput, I18N.SAVE_PASSWORD_REQUIRED);
+          isValid = false;
+        } else {
+          clearFieldError(savePasswordInput);
+        }
       }
       
       return isValid;

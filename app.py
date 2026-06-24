@@ -308,6 +308,9 @@ TRANSLATIONS = {
         '两次输入的密码不一致': 'Passwords do not match',
         '请先设置访问密码（4-64 字符）': 'Please set an access password (4-64 characters) first',
         '密码长度需为 4-64 字符': 'Password length must be 4-64 characters',
+        '请输入访问密码以保存修改': 'Enter the access password to save changes',
+        '保存修改前请确认访问密码。': 'Confirm the access password before saving changes.',
+        '尝试次数过多，请稍后再试': 'Too many attempts, please try again later',
         '已导入并覆盖所有数据': 'Imported and overwrote all data',
         '导入失败：上传表单解析错误': 'Import failed: invalid upload form data',
         '导入失败：JSON 格式无效': 'Import failed: invalid JSON',
@@ -828,7 +831,10 @@ def new_prompt():
     if request.method == 'POST':
         conn = get_db()
         auth_mode = get_setting(conn, 'auth_mode', 'off') or 'off'
-        conn.close()
+        save_redirect = require_save_password(conn, next_url=url_for('new_prompt'))
+        if save_redirect:
+            conn.close()
+            return save_redirect
         name = request.form.get('name', '').strip() or '未命名提示词'
         source = request.form.get('source', '').strip()
         notes = request.form.get('notes', '').strip()
@@ -839,10 +845,10 @@ def new_prompt():
         require_password = 1 if auth_mode == 'per' and request.form.get('require_password') == '1' else 0
         image_data, _, image_error = parse_image_upload(request)
         if image_error:
+            conn.close()
             flash(image_error, 'error')
             return redirect(url_for('new_prompt'))
 
-        conn = get_db()
         cur = conn.cursor()
         ts = now_ts()
         cur.execute(
@@ -866,8 +872,9 @@ def new_prompt():
     conn = get_db()
     auth_mode = get_setting(conn, 'auth_mode', 'off') or 'off'
     password_is_set = has_access_password(conn)
+    save_password_required = save_requires_password(conn)
     conn.close()
-    return render_template('prompt_detail.html', prompt=None, versions=[], current=None, auth_mode=auth_mode, has_password=password_is_set)
+    return render_template('prompt_detail.html', prompt=None, versions=[], current=None, auth_mode=auth_mode, has_password=password_is_set, save_requires_password=save_password_required)
 
 
 @app.route('/prompt/<int:prompt_id>', methods=['GET', 'POST'])
@@ -884,6 +891,10 @@ def prompt_detail(prompt_id):
         if access_redirect:
             conn.close()
             return access_redirect
+        save_redirect = require_save_password(conn, prompt_for_auth, url_for('prompt_detail', prompt_id=prompt_id))
+        if save_redirect:
+            conn.close()
+            return save_redirect
         # 保存新版本或仅更新元信息
         name = request.form.get('name', '').strip() or '未命名提示词'
         source = request.form.get('source', '').strip()
@@ -953,8 +964,9 @@ def prompt_detail(prompt_id):
     versions = conn.execute("SELECT * FROM versions WHERE prompt_id=? ORDER BY created_at DESC", (prompt_id,)).fetchall()
     current = conn.execute("SELECT * FROM versions WHERE id=?", (prompt['current_version_id'],)).fetchone() if prompt['current_version_id'] else None
     password_is_set = has_access_password(conn)
+    save_password_required = save_requires_password(conn, prompt)
     conn.close()
-    return render_template('prompt_detail.html', prompt=prompt, versions=versions, current=current, auth_mode=auth_mode, has_password=password_is_set)
+    return render_template('prompt_detail.html', prompt=prompt, versions=versions, current=current, auth_mode=auth_mode, has_password=password_is_set, save_requires_password=save_password_required)
 
 
 @app.route('/prompt/<int:prompt_id>/pin', methods=['POST'])
@@ -988,13 +1000,13 @@ def delete_prompt(prompt_id):
         action = 'delete'
         if is_rate_limited(action):
             conn.close()
-            flash('Too many attempts, please try again later', 'error')
+            flash('尝试次数过多，请稍后再试', 'error')
             return redirect(request.referrer or url_for('prompt_detail', prompt_id=prompt_id))
         delete_password = request.form.get('delete_password') or ''
         if not verify_password(conn, delete_password):
             record_auth_failure(action)
             conn.close()
-            flash('Delete password is incorrect', 'error')
+            flash('密码不正确', 'error')
             return redirect(request.referrer or url_for('prompt_detail', prompt_id=prompt_id))
         clear_auth_failures(action)
 
@@ -1531,6 +1543,36 @@ def require_prompt_access(conn, prompt, next_url: str = None):
         target = next_url or request.full_path.rstrip('?') or url_for('prompt_detail', prompt_id=prompt['id'])
         return redirect(url_for('unlock_prompt', prompt_id=prompt['id'], next=target))
     return None
+
+
+def save_requires_password(conn, prompt=None) -> bool:
+    if not has_access_password(conn):
+        return False
+    if is_site_authenticated(conn):
+        return False
+    if prompt and prompt_requires_unlock(conn, prompt) and is_prompt_unlocked(conn, prompt['id']):
+        return False
+    return True
+
+
+def require_save_password(conn, prompt=None, next_url: str = None):
+    if not save_requires_password(conn, prompt):
+        return None
+
+    action = 'save'
+    target = next_url or request.referrer or url_for('index')
+    if is_rate_limited(action):
+        flash('尝试次数过多，请稍后再试', 'error')
+        return redirect(target)
+
+    save_password = request.form.get('save_password') or ''
+    if verify_password(conn, save_password):
+        clear_auth_failures(action)
+        return None
+
+    record_auth_failure(action)
+    flash('密码不正确', 'error')
+    return redirect(target)
 
 
 def rate_limit_key(action: str):

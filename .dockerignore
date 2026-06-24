@@ -1,0 +1,12 @@
+.git
+.agents
+.venv
+data
+__pycache__
+*.py[cod]
+*.sqlite3
+.env
+.env.*
+Dockerfile
+docker-compose.yml
+README*.md
