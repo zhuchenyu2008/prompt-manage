@@ -18,6 +18,7 @@
   <div class="settings-container">
 
     <form method="post" enctype="multipart/form-data" class="settings-form">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
       <div class="settings-section">
         <div class="section-header">
           <i class="fas fa-language"></i>
@@ -98,7 +99,7 @@
           <div class="form-group">
             <label for="new_password">
               <i class="fas fa-key"></i>
-              {{ t('设置/修改密码（4-8 位）') }}
+              {{ t('设置/修改密码（4-64 字符）') }}
             </label>
             <div class="auth-fields">
               {% if has_password %}

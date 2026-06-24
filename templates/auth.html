@@ -17,6 +17,7 @@
 
   <div class="settings-container" style="max-width:420px; margin:0 auto;">
     <form method="post" class="settings-form" style="padding: var(--spacing-2xl);">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
       {% if prompt %}
       <div class="form-group" style="margin-bottom: var(--spacing-lg);">
         <label style="display:flex; align-items:center; gap:8px; font-weight:600;">
@@ -32,7 +33,7 @@
       <div class="form-group">
         <label for="password" style="display:flex; align-items:center; gap:8px; font-weight:600;">
           <i class="fas fa-key" style="color:var(--primary);"></i>
-          {{ t('访问密码（4-8 位）') }}
+          {{ t('访问密码') }}
         </label>
         <input type="password" id="password" name="password" placeholder="{{ t('请输入密码') }}" required style="width:100%; padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--bg); color:var(--fg);" />
         <input type="hidden" name="next" value="{{ next }}" />

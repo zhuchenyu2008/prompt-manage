@@ -49,7 +49,7 @@ Default is Chinese. You can switch to English in the "设置-语言-英文" at t
 
 ### 🔒 Optional Access Password
 - Three modes (Settings): Off / Per‑prompt / Global
-- Password length: 4–8 digits; required when enabling for the first time
+- New passwords must be 4-64 characters; existing legacy 4-8 digit passwords continue to work until changed
 - Per‑prompt: check “Require password” in the editor
 - Home behavior (Per‑prompt mode): protected cards show only title and “Source: Password required”; click to unlock
 - Session unlock: unlocked prompts allowed for current session; “Logout” clears auth
@@ -242,7 +242,7 @@ Export example
 
 ### Access Password
 1. Settings → Access Password.
-2. Set/change password (4–8 digits).
+2. Set/change password (4-64 characters).
 3. Modes:
    - Per‑prompt: check “Require password” in editor.
    - Global: every page requires auth when on.
@@ -261,7 +261,7 @@ Export example
 Default port is `3501`. In `app.py`:
 
 ```python
-app.run(host='0.0.0.0', port=3501, debug=True)
+app.run(host='0.0.0.0', port=3501, debug=_is_debug_env)
 ```
 
 ### Version Cleanup
@@ -270,7 +270,9 @@ app.run(host='0.0.0.0', port=3501, debug=True)
 - Adjustable in Settings
 
 ### Security Notes
-- The access password is lightweight; SHA‑256 without salt. Do not use for high‑security scenarios.
+- Set `SECRET_KEY` in production. The app refuses to start without it outside development mode.
+- New passwords are stored with Werkzeug password hashing. Legacy SHA-256 hashes are migrated after successful login.
+- Deleting a prompt requires re-entering the access password whenever a password is configured.
 - Forgot password? Clear via SQLite:
   ```sql
   DELETE FROM settings WHERE key='auth_password_hash';

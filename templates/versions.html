@@ -1613,6 +1613,12 @@
           form.method = 'POST';
           form.action = `/prompt/{{ prompt['id'] }}/rollback/${versionId}`;
           
+          const csrf = document.createElement('input');
+          csrf.type = 'hidden';
+          csrf.name = '_csrf_token';
+          csrf.value = {{ csrf_token()|tojson }};
+          form.appendChild(csrf);
+          
           // Add bump kind selection
           const bumpKind = document.createElement('input');
           bumpKind.type = 'hidden';

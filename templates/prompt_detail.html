@@ -25,6 +25,7 @@
     </div>
 
     <form method="post" class="prompt-form" enctype="multipart/form-data">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
       <div class="form-sections">
         <!-- Basic Information Section -->
         <div class="form-section primary-section">
@@ -250,8 +251,43 @@
   </div>
 
   {% if prompt %}
+  <!-- Delete Modal -->
+  <div id="deleteModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
+    <div class="modal-content delete-modal-content">
+      <div class="modal-header delete-modal-header">
+        <h3 id="deleteModalTitle"><i class="fas fa-trash"></i> {{ t('删除提示词') }}</h3>
+        <button type="button" class="modal-close" onclick="closeDeleteModal()" aria-label="{{ t('取消') }}">&times;</button>
+      </div>
+      <div class="modal-body delete-modal-body">
+        <p class="delete-warning">{{ t('确定要删除该提示词及其所有版本吗？此操作不可恢复。') }}</p>
+        {% if has_password %}
+        <div class="form-group delete-password-group">
+          <label for="deletePasswordInput">
+            <i class="fas fa-key"></i>
+            {{ t('访问密码') }}
+          </label>
+          <input type="password" id="deletePasswordInput" placeholder="{{ t('请输入密码') }}" autocomplete="current-password" />
+        </div>
+        {% endif %}
+        <div id="deletePasswordError" class="delete-password-error" role="alert" aria-live="polite"></div>
+        <div class="delete-modal-actions">
+          <button type="button" class="btn ghost" onclick="closeDeleteModal()">
+            {{ t('取消') }}
+          </button>
+          <button type="button" class="btn primary delete-confirm-btn" id="deleteConfirmBtn" onclick="submitDelete()">
+            <i class="fas fa-trash"></i>
+            {{ t('确认删除') }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Hidden delete form (separate from edit form to avoid nested forms) -->
-  <form id="deleteForm" method="post" action="{{ url_for('delete_prompt', prompt_id=prompt['id']) }}"></form>
+  <form id="deleteForm" method="post" action="{{ url_for('delete_prompt', prompt_id=prompt['id']) }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+    <input type="hidden" name="delete_password" id="deletePasswordField" value="" />
+  </form>
   {% endif %}
 
   <style>
@@ -782,6 +818,72 @@
       line-height: 1.6;
       font-size: var(--font-size-sm);
     }
+
+    .delete-modal-content {
+      max-width: 480px;
+    }
+
+    .delete-modal-header {
+      background: color-mix(in srgb, var(--del) 8%, var(--card));
+    }
+
+    .delete-modal-header h3 {
+      color: var(--del);
+    }
+
+    .delete-warning {
+      margin: 0 0 var(--spacing-lg) 0;
+      color: var(--fg);
+      line-height: 1.6;
+    }
+
+    .delete-password-group {
+      margin-bottom: var(--spacing-md);
+    }
+
+    .delete-password-group label {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+      font-weight: 600;
+      margin-bottom: var(--spacing-sm);
+    }
+
+    .delete-password-group input {
+      width: 100%;
+      padding: var(--spacing-md);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: var(--bg);
+      color: var(--fg);
+      font-size: var(--font-size-base);
+    }
+
+    .delete-password-error {
+      min-height: 1.4em;
+      color: var(--del);
+      font-size: var(--font-size-sm);
+      margin-bottom: var(--spacing-md);
+    }
+
+    .delete-modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--spacing-md);
+      flex-wrap: wrap;
+    }
+
+    .delete-confirm-btn {
+      background: var(--del);
+      border-color: var(--del);
+      color: var(--text-on-primary);
+    }
+
+    .delete-confirm-btn:hover {
+      background: color-mix(in srgb, var(--del) 88%, black);
+      border-color: color-mix(in srgb, var(--del) 88%, black);
+      color: var(--text-on-primary);
+    }
     
     @keyframes modalSlideIn {
       from {
@@ -884,7 +986,9 @@
     // i18n strings for this page
     const I18N = {
       SAVE_PROCESSING: {{ t('保存中...')|tojson }},
-      CONFIRM_DELETE: {{ t('确定要删除该提示词及其所有版本吗？此操作不可恢复。')|tojson }},
+      DELETE_PASSWORD_REQUIRED: {{ t('访问密码不能为空')|tojson }},
+      DELETE_CONFIRM: {{ t('确认删除')|tojson }},
+      DELETE_PROCESSING: {{ t('删除中...')|tojson }},
       CHAR: {{ t('字符')|tojson }},
       ENTER_NAME: {{ t('请输入提示词名称')|tojson }},
       ENTER_CONTENT: {{ t('请输入提示词内容')|tojson }},
@@ -923,6 +1027,16 @@
       
       // Initialize collapsible sections
       initializeCollapsibleSections();
+
+      const deletePasswordInput = document.getElementById('deletePasswordInput');
+      if (deletePasswordInput) {
+        deletePasswordInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            submitDelete();
+          }
+        });
+      }
     });
     
     function initializeForm() {
@@ -968,16 +1082,50 @@
       });
     }
 
-    // 删除确认：仅一次确认
-    function confirmDelete() {
-      return confirm(I18N.CONFIRM_DELETE);
+    function triggerDelete() {
+      const modal = document.getElementById('deleteModal');
+      const error = document.getElementById('deletePasswordError');
+      const confirmBtn = document.getElementById('deleteConfirmBtn');
+      const passwordInput = document.getElementById('deletePasswordInput');
+      if (!modal) return;
+
+      if (error) error.textContent = '';
+      if (confirmBtn) {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '<i class="fas fa-trash"></i> ' + I18N.DELETE_CONFIRM;
+      }
+      if (passwordInput) passwordInput.value = '';
+      modal.style.display = 'block';
+      setTimeout(() => {
+        if (passwordInput) passwordInput.focus();
+        else if (confirmBtn) confirmBtn.focus();
+      }, 0);
     }
 
-    function triggerDelete() {
-      if (confirmDelete()) {
-        const f = document.getElementById('deleteForm');
-        if (f) f.submit();
+    function closeDeleteModal() {
+      const modal = document.getElementById('deleteModal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function submitDelete() {
+      const form = document.getElementById('deleteForm');
+      const passwordField = document.getElementById('deletePasswordField');
+      const passwordInput = document.getElementById('deletePasswordInput');
+      const error = document.getElementById('deletePasswordError');
+      const confirmBtn = document.getElementById('deleteConfirmBtn');
+
+      if (passwordInput && !passwordInput.value.trim()) {
+        if (error) error.textContent = I18N.DELETE_PASSWORD_REQUIRED;
+        passwordInput.focus();
+        return;
       }
+
+      if (passwordField) passwordField.value = passwordInput ? passwordInput.value : '';
+      if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<span class="loading"></span> ' + I18N.DELETE_PROCESSING;
+      }
+      if (form) form.submit();
     }
     
     function autoResizeTextarea(textarea) {
@@ -1211,9 +1359,13 @@
     
     // Close modal when clicking outside
     window.addEventListener('click', (e) => {
-      const modal = document.getElementById('previewModal');
-      if (e.target === modal) {
+      const previewModal = document.getElementById('previewModal');
+      const deleteModal = document.getElementById('deleteModal');
+      if (e.target === previewModal) {
         closePreview();
+      }
+      if (e.target === deleteModal) {
+        closeDeleteModal();
       }
     });
     
@@ -1234,6 +1386,7 @@
       // Escape to close modal
       if (e.key === 'Escape') {
         closePreview();
+        closeDeleteModal();
       }
     });
     

@@ -146,6 +146,7 @@
               </a>
               <div class="card-actions">
                 <form method="post" action="{{ url_for('toggle_pin', prompt_id=p['id']) }}" class="inline-form">
+                  <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
                   <button class="icon-btn" title="{{ t('置顶/取消置顶') }}" aria-label="{{ t('置顶') }}" type="submit">
                     {% if p['pinned'] %}
                       <i class="fas fa-star" style="color: var(--star);"></i>

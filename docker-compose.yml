@@ -11,6 +11,8 @@ services:
       - prompt-data:/app/data
     environment:
       - FLASK_ENV=production
+      - SECRET_KEY=${SECRET_KEY:?set SECRET_KEY before starting prompt-manager}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-0}
     restart: unless-stopped
 
 volumes:
