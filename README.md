@@ -14,9 +14,9 @@ A fully functional local prompt management system that supports version control,
 
 ### 📝 提示词管理
 - **创建编辑**：支持名称、来源、标签、备注等完整元信息
-- **单图支持**：每个提示词可绑定 1 张图片（`image_data`，Base64 存储）
-- **图片约束**：支持 `jpg/jpeg/png/webp`，最大 5MB
-- **兼容迁移**：启动时自动迁移旧数据库结构，不破坏现有数据
+- **单封面支持**：每个提示词可绑定 1 张封面，文件与缩略图保存在 `data/uploads/covers`
+- **安全处理**：按真实内容识别 JPEG/PNG/静态 WebP，最大 5MB，处理 EXIF 方向并清除元数据
+- **兼容迁移**：启动时自动将旧 Base64 图片迁移到文件存储，不破坏现有数据
 - **内容预览**：首页显示内容摘要，支持一键复制完整内容
 - **置顶功能**：重要提示词可置顶显示
 - **智能搜索**：支持名称、来源、备注、标签、内容的全文搜索
@@ -47,13 +47,13 @@ A fully functional local prompt management system that supports version control,
 - **桌面端视图切换**：首页支持列表/网格一键切换，并记住偏好
 - **提示词颜色标注（新）**：在“高级设置”为提示词设置颜色（支持 #RGB/#RRGGBB），首页卡片将显示细微的同色外圈；提供可视化取色器、小圆点预览与“一键清除”按钮；留空则不设置
 - **界面语言（新）**：在“设置”中可切换界面语言（中文/英文），默认中文
-- **首页卡片展示（含图）**：保持原有卡片视觉体系；有图提示词在内容区下方显示图片，内容预览叠加在图片上并带渐变遮罩；无图提示词保持原有样式
+- **首页卡片展示（含图）**：封面叠加两行内容预览和渐变遮罩，支持焦点位置、网格/列表布局与完整图片灯箱
 - **锁定提示词图片隐藏**：在“指定提示词密码”模式下，锁定卡片不显示图片
 
 ### 📤 数据管理
-- **导入导出**：支持 JSON/CSV 两种格式的完整数据备份和恢复
-- **图片兼容**：JSON/CSV 均支持 `image_data` 字段（Base64），无需额外打包图片文件
-- **CSV 字段**：`id,name,source,notes,color,tags,image_data,pinned,require_password,created_at,updated_at,current_version_id,versions`
+- **导入导出**：推荐 ZIP 完整备份（`manifest.json + images/`），同时兼容 JSON/CSV
+- **图片兼容**：JSON/CSV 继续使用 `image_data` Base64；导入时会校验并转为文件存储
+- **CSV 字段**：`id,name,source,notes,color,tags,image_data,pinned,cover_alt,cover_focus_x,cover_focus_y,require_password,created_at,updated_at,current_version_id,versions`
 - **CSV 复杂字段**：`tags`、`versions` 以 JSON 字符串存储
 - **数据安全**：本地 SQLite 存储，无云端依赖
 - **设置管理**：可配置版本清理阈值与访问密码等系统参数
@@ -173,8 +173,9 @@ docker run -d -p 3501:3501 -v prompt-data:/app/data prompt-manager
 ```
 prompt/
 ├── app.py              # Flask 应用主文件
+├── cover_images.py     # 封面校验、标准化与文件存储
 ├── requirements.txt    # Python 依赖文件
-├── data.sqlite3        # 本地运行时可选的数据库文件（通过 DB_PATH 指向）
+├── data/               # 数据库与 uploads/covers 封面文件
 ├── Dockerfile          # Docker 镜像配置
 ├── docker-compose.yml  # Docker Compose 配置文件
 ├── .dockerignore       # Docker 构建忽略文件
@@ -186,6 +187,7 @@ prompt/
 │   ├── diff.html       # 对比页面
 │   ├── settings.html   # 设置页面
 │   └── auth.html       # 登录/解锁页面（访问密码）
+├── tests/              # 封面处理与 Flask 集成测试
 ├── static/             # 静态资源
 │   ├── css/
 │   │   └── style.css   # 样式文件
@@ -198,7 +200,9 @@ prompt/
 
 ### 表结构
 - **prompts**: 提示词基本信息
-  - `id`, `name`, `source`, `notes`, `color`, `tags`, `image_data`, `pinned`, `created_at`, `updated_at`, `current_version_id`, `require_password`
+  - `id`, `name`, `source`, `notes`, `color`, `tags`, `pinned`, `created_at`, `updated_at`, `current_version_id`, `require_password`
+  - 封面字段：`cover_file`, `cover_thumb`, `cover_mime`, `cover_width`, `cover_height`, `cover_focus_x`, `cover_focus_y`, `cover_alt`
+  - `image_data` 仅保留用于旧数据迁移和 JSON/CSV 兼容
 - **versions**: 版本历史记录
   - `id`, `prompt_id`, `version`, `content`, `created_at`, `parent_version_id`
 - **settings**: 系统设置
@@ -221,6 +225,9 @@ prompt/
       "color": "#409eff",
       "tags": ["场景/客服", "业务/售后"],
       "image_data": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...",
+      "cover_alt": "客服工作台封面",
+      "cover_focus_x": 50,
+      "cover_focus_y": 50,
       "pinned": true,
       "require_password": false,
       "created_at": "2024-01-01T00:00:00",
@@ -265,11 +272,11 @@ prompt/
 ### 高级功能
 
 - **标签系统**：使用 `/` 创建层级标签，如 `部门/技术/开发`
-- **批量操作**：通过 JSON/CSV 导入导出进行批量数据管理（`/export?format=json`、`/export?format=csv`）
+- **批量操作**：通过 ZIP/JSON/CSV 导入导出进行批量数据管理（推荐 `/export?format=zip`）
 - **版本对比**：支持词级和行级两种对比模式
 - **主题切换**：点击右上角主题按钮切换深色/浅色模式
 - **颜色导入导出**：导出 JSON 包含 `color` 字段；导入时自动识别与校验（非法值忽略），留空按未设置处理
-- **图片管理**：编辑页使用 `multipart/form-data`，支持上传、覆盖、移除图片；前端即时校验格式/大小，后端进行二次校验
+- **封面管理**：支持点击、拖放、粘贴、替换、移除、焦点拖动和灯箱查看；封面不参与提示词版本历史
  
 ### 访问密码设置
 1. 打开“设置 → 访问密码”。

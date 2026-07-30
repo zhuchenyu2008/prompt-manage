@@ -40,7 +40,7 @@
                 {{ t('提示词名称') }}
                 <span class="required">*</span>
               </label>
-              <input type="text" id="name" name="name" value="{{ (prompt and prompt['name']) or '' }}" 
+              <input type="text" id="name" name="name" value="{{ form_values.get('name', (prompt and prompt['name']) or '') }}"
                      placeholder="{{ t('输入提示词的名称') }}" required />
               </div>
 
@@ -52,7 +52,7 @@
               </label>
               <div class="textarea-wrapper">
                 <textarea id="content" name="content" rows="16" 
-                          placeholder="{{ t('在此输入提示词的完整内容...') }}">{{ (current and current['content']) or '' }}</textarea>
+                          placeholder="{{ t('在此输入提示词的完整内容...') }}">{{ form_values.get('content', (current and current['content']) or '') }}</textarea>
                 <div class="textarea-footer">
                   <div class="char-counter">0 {{ t('字符') }}</div>
                   <div class="textarea-actions">
@@ -86,7 +86,7 @@
                   <i class="fas fa-link"></i>
                   {{ t('来源') }}
                 </label>
-                <input type="text" id="source" name="source" value="{{ (prompt and prompt['source']) or '' }}" 
+                <input type="text" id="source" name="source" value="{{ form_values.get('source', (prompt and prompt['source']) or '') }}"
                        placeholder="{{ t('提示词来源') }}" />
                 </div>
 
@@ -97,7 +97,7 @@
                 </label>
                 <div class="tags-input-wrapper">
                   <input type="text" id="tags" name="tags" 
-                         value="{% if prompt and prompt['tags'] %}{{ (prompt['tags']|loads)|join(', ') }}{% endif %}" 
+                         value="{{ form_values.get('tags', ((prompt['tags']|loads)|join(', ')) if prompt and prompt['tags'] else '') }}"
                          placeholder="{{ t('标签，用逗号分隔') }}" />
                   </div>
               </div>
@@ -112,9 +112,9 @@
                     <div class="color-swatch-wrap">
                       <span class="color-swatch" id="colorSwatch" title="{{ t('选择颜色') }}" role="button" tabindex="0" aria-label="{{ t('选择颜色') }}"></span>
                       <input type="color" id="colorPicker" aria-label="{{ t('选择颜色') }}"
-                             value="{{ (prompt and prompt['color']) or '#409eff' }}" />
+                             value="{{ form_values.get('color', (prompt and prompt['color']) or '#409eff') or '#409eff' }}" />
                     </div>
-                    <input type="text" id="color" name="color" value="{{ (prompt and prompt['color']) or '' }}" 
+                    <input type="text" id="color" name="color" value="{{ form_values.get('color', (prompt and prompt['color']) or '') }}"
                            placeholder="{{ t('例如 #409eff，留空不设置') }}" />
                     <button type="button" class="icon-btn" id="colorClearBtn" title="{{ t('清除颜色') }}">
                       <i class="fas fa-eraser"></i>
@@ -129,32 +129,67 @@
                   <i class="fas fa-sticky-note"></i>
                   {{ t('备注') }}
                 </label>
-                <input type="text" id="notes" name="notes" value="{{ (prompt and prompt['notes']) or '' }}" 
+                <input type="text" id="notes" name="notes" value="{{ form_values.get('notes', (prompt and prompt['notes']) or '') }}"
                        placeholder="{{ t('补充说明或使用注意事项') }}" />
               </div>
 
-              <div class="form-group">
+              {% set has_cover = prompt and prompt['cover_file'] %}
+              {% set cover_focus_x = form_values.get('cover_focus_x', (prompt and prompt['cover_focus_x']) or 50) %}
+              {% set cover_focus_y = form_values.get('cover_focus_y', (prompt and prompt['cover_focus_y']) or 50) %}
+              <div class="form-group cover-form-group">
                 <label for="image_file">
                   <i class="fas fa-image"></i>
                   {{ t('封面图片') }}
                 </label>
                 <div class="image-upload-wrap">
-                  <input type="file" id="image_file" name="image_file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" />
-                  <div class="input-help">{{ t('支持 jpg/jpeg/png/webp，最大 5MB。') }}</div>
-                  {% if prompt and prompt['image_data'] %}
-                    <div class="image-preview-box">
-                      <span class="image-preview-label">{{ t('当前图片') }}</span>
-                      <img src="{{ prompt['image_data'] }}" alt="{{ t('当前图片') }}" class="image-preview" />
+                  <input type="file" id="image_file" name="image_file"
+                         accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" />
+                  <div id="coverDropZone" class="cover-drop-zone{% if has_cover %} has-cover{% endif %}" tabindex="0" role="button"
+                       aria-label="{{ t('拖放、粘贴或点击选择图片') }}">
+                    <div id="coverEmptyState" class="cover-empty-state"{% if has_cover %} hidden{% endif %}>
+                      <i class="fas fa-cloud-arrow-up"></i>
+                      <strong>{{ t('拖放、粘贴或点击选择图片') }}</strong>
+                      <span>{{ t('支持 jpg/jpeg/png/webp，最大 5MB。') }}</span>
                     </div>
-                    <label class="checkbox-label remove-image-check">
-                      <input type="checkbox" name="remove_image" value="1" />
-                      <span class="checkbox-custom"></span>
-                      <span class="checkbox-text">
-                        <i class="fas fa-trash"></i>
-                        {{ t('移除当前图片') }}
-                      </span>
-                    </label>
+                    <div id="coverPreviewBox" class="image-preview-box"{% if not has_cover %} hidden{% endif %}>
+                      <img id="coverPreview"
+                           {% if has_cover %}src="{{ url_for('prompt_cover', prompt_id=prompt['id'], variant='full') }}"{% endif %}
+                           alt="{{ form_values.get('cover_alt', (prompt and prompt['cover_alt']) or t('当前图片')) }}"
+                           class="image-preview"
+                           style="object-position: {{ cover_focus_x }}% {{ cover_focus_y }}%;" />
+                      <div id="coverLoadError" class="cover-load-error" hidden>
+                        <i class="fas fa-image"></i>
+                        <span>{{ t('图片加载失败') }}</span>
+                        <button type="button" class="btn ghost small" id="retryCoverBtn">{{ t('重新上传') }}</button>
+                      </div>
+                      <span class="focus-marker" id="focusMarker" style="left: {{ cover_focus_x }}%; top: {{ cover_focus_y }}%;" aria-hidden="true"></span>
+                    </div>
+                  </div>
+                  <div id="coverMeta" class="cover-meta"{% if not has_cover %} hidden{% endif %}>
+                    {% if has_cover %}
+                      <span>{{ t('格式：') }}{{ prompt['cover_mime'] }}</span>
+                      <span>{{ t('尺寸：') }}{{ prompt['cover_width'] }} × {{ prompt['cover_height'] }}</span>
+                    {% endif %}
+                  </div>
+                  <div class="cover-actions">
+                    <button type="button" class="btn ghost small" id="replaceCoverBtn">
+                      <i class="fas fa-rotate"></i> {{ t('替换封面') }}
+                    </button>
+                    <button type="button" class="btn ghost small" id="removeCoverBtn"{% if not has_cover %} hidden{% endif %}>
+                      <i class="fas fa-trash"></i> <span>{{ t('移除当前图片') }}</span>
+                    </button>
+                  </div>
+                  <input type="hidden" id="removeImage" name="remove_image" value="{{ form_values.get('remove_image', '0') }}" />
+                  <input type="hidden" id="coverFocusX" name="cover_focus_x" value="{{ cover_focus_x }}" />
+                  <input type="hidden" id="coverFocusY" name="cover_focus_y" value="{{ cover_focus_y }}" />
+                  <div class="input-help">{{ t('拖动图片可调整封面焦点') }} · {{ t('封面图片不参与版本历史。') }}</div>
+                  {% if image_error %}
+                    <div class="field-error cover-server-error" role="alert">{{ t(image_error) }}</div>
                   {% endif %}
+                  <label for="cover_alt" class="cover-alt-label">{{ t('封面说明') }}</label>
+                  <input type="text" id="cover_alt" name="cover_alt"
+                         value="{{ form_values.get('cover_alt', (prompt and prompt['cover_alt']) or '') }}"
+                         placeholder="{{ t('用于图片替代文本，可选') }}" />
                 </div>
               </div>
             </div>
@@ -162,7 +197,7 @@
             <div class="form-group" style="margin-top: var(--spacing-md);">
               <label class="checkbox-label">
                 <input type="checkbox" name="require_password" value="1"
-                       {% if prompt and prompt['require_password'] %}checked{% endif %}
+                       {% if (form_submitted and form_values.get('require_password') == '1') or (not form_submitted and prompt and prompt['require_password']) %}checked{% endif %}
                        {% if auth_mode != 'per' %}disabled{% endif %} />
                 <span class="checkbox-custom"></span>
                 <span class="checkbox-text">
@@ -490,64 +525,153 @@
       transform: translateY(-1px);
     }
 
-    input[type="file"] {
-      width: 100%;
-      padding: var(--spacing-sm);
-      border: 1px dashed var(--border);
-      border-radius: var(--radius-lg);
-      background: color-mix(in srgb, var(--card) 60%, transparent);
-      color: var(--muted);
-      transition: all 0.3s ease;
-    }
-
-    input[type="file"]:hover {
-      border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
-      background: color-mix(in srgb, var(--primary) 4%, var(--card));
-    }
-
-    input[type="file"]:focus {
-      outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
-    }
-
     .image-upload-wrap {
       display: flex;
       flex-direction: column;
       gap: var(--spacing-sm);
     }
 
-    .image-preview-box {
-      margin-top: var(--spacing-xs);
-      padding: var(--spacing-sm);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      background: color-mix(in srgb, var(--card) 50%, transparent);
+    .cover-empty-state[hidden],
+    .image-preview-box[hidden],
+    .cover-meta[hidden],
+    .cover-load-error[hidden],
+    #removeCoverBtn[hidden] {
+      display: none !important;
     }
 
-    .image-preview-label {
-      display: inline-block;
-      margin-bottom: var(--spacing-xs);
-      font-size: var(--font-size-sm);
+    .cover-drop-zone {
+      position: relative;
+      min-height: 168px;
+      border: 1px dashed color-mix(in srgb, var(--primary) 35%, var(--border));
+      border-radius: var(--radius-lg);
+      background: color-mix(in srgb, var(--primary) 3%, var(--card));
+      overflow: hidden;
+      cursor: pointer;
+      transition: border-color .2s ease, background .2s ease, transform .2s ease;
+    }
+
+    .cover-drop-zone:hover,
+    .cover-drop-zone.is-dragging,
+    .cover-drop-zone:focus-visible {
+      border-color: var(--primary);
+      background: color-mix(in srgb, var(--primary) 7%, var(--card));
+      outline: none;
+    }
+
+    .cover-drop-zone.is-dragging {
+      transform: translateY(-2px);
+    }
+
+    #image_file {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .cover-empty-state {
+      min-height: 168px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--spacing-xs);
+      padding: var(--spacing-lg);
       color: var(--muted);
+      text-align: center;
+    }
+
+    .cover-empty-state i {
+      font-size: 1.7rem;
+      color: var(--primary);
+    }
+
+    .cover-empty-state strong {
+      color: var(--fg);
+      font-size: var(--font-size-sm);
+    }
+
+    .cover-empty-state span {
+      font-size: var(--font-size-xs);
+    }
+
+    .image-preview-box {
+      position: relative;
+      height: 220px;
+      overflow: hidden;
+      background: color-mix(in srgb, var(--bg) 70%, var(--card));
+      touch-action: none;
+      cursor: crosshair;
     }
 
     .image-preview {
       display: block;
       width: 100%;
-      max-height: 220px;
+      height: 100%;
       object-fit: cover;
-      border-radius: var(--radius-md);
-      border: 1px solid var(--border);
-      transition: transform 0.3s ease, opacity 0.3s ease;
+      transition: opacity 0.2s ease;
+      user-select: none;
+      pointer-events: none;
     }
 
-    .image-preview:hover {
-      transform: scale(1.01);
+    .focus-marker {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border: 2px solid white;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 1px 8px rgba(0, 0, 0, .7);
+      pointer-events: none;
     }
 
-    .remove-image-check {
+    .focus-marker::after {
+      content: '';
+      position: absolute;
+      inset: 6px;
+      border-radius: 50%;
+      background: white;
+    }
+
+    .cover-meta,
+    .cover-actions {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--spacing-sm);
+    }
+
+    .cover-meta {
+      font-size: var(--font-size-xs);
+      color: var(--muted);
+    }
+
+    .cover-alt-label {
       margin-top: var(--spacing-xs);
+      font-size: var(--font-size-sm);
+    }
+
+    .cover-load-error {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--spacing-sm);
+      background: var(--card);
+      color: var(--muted);
+      z-index: 3;
+    }
+
+    .cover-server-error {
+      color: var(--del);
+      font-size: var(--font-size-sm);
+      line-height: 1.4;
     }
     
     textarea {
@@ -1015,7 +1139,11 @@
       COPY_FAIL: {{ t('复制失败，请手动选择文本复制')|tojson }},
       CLEAR_CONFIRM: {{ t('确定要清空内容吗？此操作不可撤销。')|tojson }},
       IMAGE_TYPE_ERROR: {{ t('图片上传失败：仅支持 jpg/jpeg/png/webp 格式')|tojson }},
-      IMAGE_SIZE_ERROR: {{ t('图片上传失败：文件大小不能超过 5MB')|tojson }}
+      IMAGE_SIZE_ERROR: {{ t('图片上传失败：文件大小不能超过 5MB')|tojson }},
+      REMOVE_COVER: {{ t('移除当前图片')|tojson }},
+      UNDO_REMOVE: {{ t('撤销移除')|tojson }},
+      FORMAT: {{ t('格式：')|tojson }},
+      DIMENSIONS: {{ t('尺寸：')|tojson }}
     };
     // Auto-resize toggle state (default: off)
     let autoResizeEnabled = false;
@@ -1066,18 +1194,12 @@
       form.addEventListener('submit', (e) => {
         if (imageInput && imageInput.files && imageInput.files[0]) {
           const file = imageInput.files[0];
-          const allow = ['image/jpeg', 'image/png', 'image/webp'];
-          if (!allow.includes(file.type)) {
+          const coverError = validateCoverFile(file);
+          if (coverError) {
             e.preventDefault();
-            showFieldError(imageInput, I18N.IMAGE_TYPE_ERROR);
+            showCoverClientError(coverError);
             return;
           }
-          if (file.size > 5 * 1024 * 1024) {
-            e.preventDefault();
-            showFieldError(imageInput, I18N.IMAGE_SIZE_ERROR);
-            return;
-          }
-          clearFieldError(imageInput);
         }
 
         if (!validateForm()) {
@@ -1512,21 +1634,218 @@
       }
     });
 
-    document.getElementById('image_file')?.addEventListener('change', (e) => {
-      const file = e.target.files && e.target.files[0];
-      if (!file) return;
+    function validateCoverFile(file) {
+      if (!file) return null;
+      if (file.size > 5 * 1024 * 1024) return I18N.IMAGE_SIZE_ERROR;
       const allow = ['image/jpeg', 'image/png', 'image/webp'];
-      if (!allow.includes(file.type)) {
-        e.target.value = '';
-        showFieldError(e.target, I18N.IMAGE_TYPE_ERROR);
-        return;
+      if (file.type && !allow.includes(file.type)) return I18N.IMAGE_TYPE_ERROR;
+      return null;
+    }
+
+    function showCoverClientError(message) {
+      const wrap = document.querySelector('.image-upload-wrap');
+      if (!wrap) return;
+      let error = document.getElementById('coverClientError');
+      if (!error) {
+        error = document.createElement('div');
+        error.id = 'coverClientError';
+        error.className = 'field-error cover-server-error';
+        error.setAttribute('role', 'alert');
+        const altLabel = wrap.querySelector('.cover-alt-label');
+        wrap.insertBefore(error, altLabel);
       }
-      if (file.size > 5 * 1024 * 1024) {
-        e.target.value = '';
-        showFieldError(e.target, I18N.IMAGE_SIZE_ERROR);
-        return;
+      error.textContent = message;
+    }
+
+    function clearCoverClientError() {
+      document.getElementById('coverClientError')?.remove();
+      document.querySelector('.cover-server-error')?.remove();
+    }
+
+    (function setupCoverEditor() {
+      const input = document.getElementById('image_file');
+      const dropZone = document.getElementById('coverDropZone');
+      const emptyState = document.getElementById('coverEmptyState');
+      const previewBox = document.getElementById('coverPreviewBox');
+      const preview = document.getElementById('coverPreview');
+      const meta = document.getElementById('coverMeta');
+      const removeBtn = document.getElementById('removeCoverBtn');
+      const replaceBtn = document.getElementById('replaceCoverBtn');
+      const retryBtn = document.getElementById('retryCoverBtn');
+      const loadError = document.getElementById('coverLoadError');
+      const removeInput = document.getElementById('removeImage');
+      const focusX = document.getElementById('coverFocusX');
+      const focusY = document.getElementById('coverFocusY');
+      const marker = document.getElementById('focusMarker');
+      if (!input || !dropZone || !preview || !previewBox) return;
+
+      const initial = {
+        src: preview.getAttribute('src') || '',
+        meta: meta?.innerHTML || '',
+        x: Number(focusX?.value || 50),
+        y: Number(focusY?.value || 50)
+      };
+      let objectUrl = null;
+      let isRemoved = removeInput?.value === '1';
+      let draggingFocus = false;
+
+      const formatBytes = (bytes) => bytes < 1024 * 1024
+        ? `${(bytes / 1024).toFixed(1)} KB`
+        : `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+
+      function setFocus(x, y) {
+        x = Math.max(0, Math.min(100, x));
+        y = Math.max(0, Math.min(100, y));
+        if (focusX) focusX.value = x.toFixed(2);
+        if (focusY) focusY.value = y.toFixed(2);
+        preview.style.objectPosition = `${x}% ${y}%`;
+        if (marker) {
+          marker.style.left = `${x}%`;
+          marker.style.top = `${y}%`;
+        }
       }
-      clearFieldError(e.target);
-    });
+
+      function showPreview(src) {
+        preview.src = src;
+        previewBox.hidden = false;
+        emptyState.hidden = true;
+        dropZone.classList.add('has-cover');
+        if (removeBtn) removeBtn.hidden = false;
+        if (loadError) loadError.hidden = true;
+      }
+
+      function showEmpty() {
+        preview.removeAttribute('src');
+        previewBox.hidden = true;
+        emptyState.hidden = false;
+        meta.hidden = true;
+        dropZone.classList.remove('has-cover');
+      }
+
+      function updateRemoveButton() {
+        if (!removeBtn) return;
+        const text = removeBtn.querySelector('span');
+        if (text) text.textContent = isRemoved ? I18N.UNDO_REMOVE : I18N.REMOVE_COVER;
+        const icon = removeBtn.querySelector('i');
+        if (icon) icon.className = isRemoved ? 'fas fa-rotate-left' : 'fas fa-trash';
+      }
+
+      function selectFile(file) {
+        const error = validateCoverFile(file);
+        if (error) {
+          input.value = '';
+          showCoverClientError(error);
+          return;
+        }
+        clearCoverClientError();
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        input.files = transfer.files;
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        objectUrl = URL.createObjectURL(file);
+        preview.onload = () => {
+          if (meta) {
+            meta.hidden = false;
+            meta.innerHTML = `<span>${I18N.FORMAT}${file.type || '—'}</span>` +
+              `<span>${I18N.DIMENSIONS}${preview.naturalWidth} × ${preview.naturalHeight}</span>` +
+              `<span>${formatBytes(file.size)}</span>`;
+          }
+        };
+        showPreview(objectUrl);
+        isRemoved = false;
+        if (removeInput) removeInput.value = '0';
+        setFocus(50, 50);
+        updateRemoveButton();
+      }
+
+      input.addEventListener('change', () => {
+        const file = input.files && input.files[0];
+        if (file) selectFile(file);
+      });
+
+      dropZone.addEventListener('click', (event) => {
+        if (event.target.closest('button') || !previewBox.hidden) return;
+        input.click();
+      });
+      dropZone.addEventListener('keydown', (event) => {
+        if ((event.key === 'Enter' || event.key === ' ') && previewBox.hidden) {
+          event.preventDefault();
+          input.click();
+        }
+      });
+      replaceBtn?.addEventListener('click', () => input.click());
+      retryBtn?.addEventListener('click', (event) => {
+        event.stopPropagation();
+        input.click();
+      });
+
+      ['dragenter', 'dragover'].forEach(type => dropZone.addEventListener(type, event => {
+        event.preventDefault();
+        dropZone.classList.add('is-dragging');
+      }));
+      ['dragleave', 'drop'].forEach(type => dropZone.addEventListener(type, event => {
+        event.preventDefault();
+        dropZone.classList.remove('is-dragging');
+      }));
+      dropZone.addEventListener('drop', event => {
+        const file = event.dataTransfer?.files?.[0];
+        if (file) selectFile(file);
+      });
+      dropZone.addEventListener('paste', event => {
+        const file = Array.from(event.clipboardData?.files || [])[0];
+        if (file) {
+          event.preventDefault();
+          selectFile(file);
+        }
+      });
+
+      removeBtn?.addEventListener('click', () => {
+        isRemoved = !isRemoved;
+        if (removeInput) removeInput.value = isRemoved ? '1' : '0';
+        input.value = '';
+        if (objectUrl) {
+          URL.revokeObjectURL(objectUrl);
+          objectUrl = null;
+        }
+        if (isRemoved) {
+          showEmpty();
+          removeBtn.hidden = false;
+        } else if (initial.src) {
+          showPreview(initial.src);
+          if (meta) {
+            meta.innerHTML = initial.meta;
+            meta.hidden = false;
+          }
+          setFocus(initial.x, initial.y);
+        } else {
+          showEmpty();
+          removeBtn.hidden = true;
+        }
+        updateRemoveButton();
+      });
+
+      function updateFocusFromPointer(event) {
+        const rect = previewBox.getBoundingClientRect();
+        setFocus(
+          ((event.clientX - rect.left) / rect.width) * 100,
+          ((event.clientY - rect.top) / rect.height) * 100
+        );
+      }
+      previewBox.addEventListener('pointerdown', event => {
+        draggingFocus = true;
+        previewBox.setPointerCapture(event.pointerId);
+        updateFocusFromPointer(event);
+      });
+      previewBox.addEventListener('pointermove', event => {
+        if (draggingFocus) updateFocusFromPointer(event);
+      });
+      previewBox.addEventListener('pointerup', () => { draggingFocus = false; });
+      previewBox.addEventListener('pointercancel', () => { draggingFocus = false; });
+
+      preview.addEventListener('error', () => {
+        if (loadError) loadError.hidden = false;
+      });
+      updateRemoveButton();
+    })();
   </script>
 {% endblock %}

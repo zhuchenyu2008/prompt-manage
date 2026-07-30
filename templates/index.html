@@ -8,12 +8,21 @@
         <input type="text" name="q" value="{{ q }}" placeholder="{{ t('搜索（名称/来源/备注/标签/当前内容）') }}" />
       </div>
       <div class="search-controls">
-        <select name="sort" title="{{ t('排序') }}" class="sort-select">
-          <option value="updated" {% if sort=='updated' %}selected{% endif %}>{{ t('最近修改') }}</option>
-          <option value="created" {% if sort=='created' %}selected{% endif %}>{{ t('创建时间') }}</option>
-          <option value="name" {% if sort=='name' %}selected{% endif %}>{{ t('名称 A-Z') }}</option>
-          <option value="tags" {% if sort=='tags' %}selected{% endif %}>{{ t('标签') }}</option>
-        </select>
+        <div class="filter-select">
+          <select name="sort" title="{{ t('排序') }}" class="sort-select">
+            <option value="updated" {% if sort=='updated' %}selected{% endif %}>{{ t('最近修改') }}</option>
+            <option value="created" {% if sort=='created' %}selected{% endif %}>{{ t('创建时间') }}</option>
+            <option value="name" {% if sort=='name' %}selected{% endif %}>{{ t('名称 A-Z') }}</option>
+            <option value="tags" {% if sort=='tags' %}selected{% endif %}>{{ t('标签') }}</option>
+          </select>
+        </div>
+        <div class="filter-select">
+          <select name="cover" title="{{ t('封面') }}" class="sort-select cover-filter-select">
+            <option value="all" {% if cover_filter=='all' %}selected{% endif %}>{{ t('全部封面') }}</option>
+            <option value="with" {% if cover_filter=='with' %}selected{% endif %}>{{ t('有封面') }}</option>
+            <option value="without" {% if cover_filter=='without' %}selected{% endif %}>{{ t('无封面') }}</option>
+          </select>
+        </div>
         <button class="btn search-btn" type="submit">
           <i class="fas fa-filter"></i> {{ t('应用') }}
         </button>
@@ -89,7 +98,7 @@
 
   <div class="content-section">
     {% if prompts|length == 0 %}
-      {% set has_filters = (q and q|length > 0) or (selected_tags and selected_tags|length > 0) or (selected_sources and selected_sources|length > 0) %}
+      {% set has_filters = (q and q|length > 0) or cover_filter != 'all' or (selected_tags and selected_tags|length > 0) or (selected_sources and selected_sources|length > 0) %}
       <div class="empty-state">
         <div class="empty-icon">
           <i class="fas fa-inbox"></i>
@@ -137,7 +146,8 @@
       <div id="promptList" class="list grid-view">
       {% for p in prompts %}
         {% set is_locked = (auth_mode == 'per') and (p['id'] in locked_ids) %}
-        <article class="card legacy-card{% if p['color'] %} color-ring{% endif %}" style="animation-delay: {{ loop.index * 0.1 }}s;{% if p['color'] %} --accent: {{ p['color'] }};{% endif %}">
+        {% set card_has_cover = (p['cover_file'] and not is_locked) %}
+        <article class="card legacy-card{% if p['color'] %} color-ring{% endif %}{% if card_has_cover %} has-cover{% endif %}" style="animation-delay: {{ loop.index * 0.1 }}s;{% if p['color'] %} --accent: {{ p['color'] }};{% endif %}">
           <div class="card-header">
             <div class="card-title-area">
               <a href="{{ url_for('unlock_prompt', prompt_id=p['id']) if is_locked else url_for('prompt_detail', prompt_id=p['id']) }}" class="card-title">
@@ -210,10 +220,23 @@
             </div>
           {% endif %}
 
-          {% set has_image = (p['image_data'] and not is_locked) %}
+          {% set has_image = card_has_cover %}
           {% if has_image %}
-            <div class="card-image-wrap media-image-wrap overlay-image-wrap">
-              <img src="{{ p['image_data'] }}" alt="{{ p['name'] }}" class="card-image" loading="lazy" />
+            <div class="card-image-wrap media-image-wrap overlay-image-wrap cover-lightbox-trigger"
+                 data-cover-url="{{ url_for('prompt_cover', prompt_id=p['id'], variant='full') }}"
+                 data-cover-alt="{{ p['cover_alt'] or p['name'] }}">
+              <img src="{{ url_for('prompt_cover', prompt_id=p['id'], variant='thumb') }}"
+                   alt="" class="card-image" loading="lazy"
+                   style="object-position: {{ p['cover_focus_x'] or 50 }}% {{ p['cover_focus_y'] or 50 }}%;" />
+              <button type="button" class="cover-image-hit" aria-label="{{ t('查看完整封面') }}"></button>
+              <div class="cover-broken-state">
+                <i class="fas fa-image"></i>
+                <span>{{ t('图片加载失败') }}</span>
+                <a href="{{ url_for('prompt_detail', prompt_id=p['id']) }}" class="btn ghost small">{{ t('重新上传') }}</a>
+              </div>
+              <button type="button" class="cover-expand-btn" title="{{ t('查看完整封面') }}" aria-label="{{ t('查看完整封面') }}">
+                <i class="fas fa-expand"></i>
+              </button>
               {% if p['current_content'] %}
                 <div class="image-preview-overlay">
                   <div class="preview-header">
@@ -226,11 +249,12 @@
                     </button>
                   </div>
                   <div class="preview-content">
-                    {{ p['current_content'][:180] }}{% if p['current_content']|length > 180 %}...{% endif %}
+                    {{ p['current_content'][:220] }}{% if p['current_content']|length > 220 %}...{% endif %}
                   </div>
-                </div>
-              {% endif %}
-            </div>
+      </div>
+    {% endif %}
+  </div>
+
           {% elif p['current_content'] and not is_locked %}
             <div class="card-preview">
               <div class="preview-header">
@@ -251,6 +275,13 @@
           {% endfor %}
           </div>
     {% endif %}
+  </div>
+
+  <div id="coverLightbox" class="cover-lightbox" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-label="{{ t('查看完整封面') }}">
+    <button type="button" class="cover-lightbox-close" aria-label="{{ t('关闭图片预览') }}">
+      <i class="fas fa-times"></i>
+    </button>
+    <img id="coverLightboxImage" alt="" />
   </div>
 
   <style>
@@ -503,8 +534,9 @@
       gap: var(--spacing-md);
       align-items: center;
       width: 100%;
-      max-width: 800px;
-      flex-wrap: wrap;
+      max-width: 100%;
+      min-width: 0;
+      flex-wrap: nowrap;
     }
     
     .search-controls {
@@ -512,7 +544,8 @@
       gap: var(--spacing-md);
       align-items: center;
       flex-wrap: nowrap;
-      flex-shrink: 0;
+      flex: 0 1 auto;
+      min-width: 0;
     }
     
     .create-section {
@@ -545,8 +578,8 @@
     
     .search-input-wrapper {
       position: relative;
-      flex: 1;
-      min-width: 200px;
+      flex: 1 1 320px;
+      min-width: 0;
     }
     
     .search-input-wrapper i {
@@ -592,6 +625,34 @@
       align-items: center;
       flex-shrink: 0;
       box-sizing: border-box;
+    }
+
+    .filter-select {
+      position: relative;
+      width: 160px;
+      min-width: 0;
+      flex: 0 1 160px;
+    }
+
+    .filter-select::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      right: 16px;
+      width: 7px;
+      height: 7px;
+      border-right: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      transform: translateY(-70%) rotate(45deg);
+      pointer-events: none;
+    }
+
+    .search-controls .sort-select {
+      width: 100%;
+      min-width: 0;
+      padding-right: 40px;
+      appearance: none;
+      -webkit-appearance: none;
     }
     
     .sort-select:focus {
@@ -991,6 +1052,7 @@
       position: relative;
       overflow: hidden;
       isolation: isolate;
+      cursor: zoom-in;
     }
 
     .legacy-card .overlay-image-wrap::after {
@@ -1002,12 +1064,26 @@
       z-index: 1;
     }
 
+    .cover-image-hit {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      border: 0;
+      background: transparent;
+      cursor: zoom-in;
+    }
+
+    .cover-image-hit:focus-visible {
+      outline: 3px solid rgba(255, 255, 255, .9);
+      outline-offset: -4px;
+    }
+
     .legacy-card .image-preview-overlay {
       position: absolute;
       left: var(--spacing-md);
       right: var(--spacing-md);
       bottom: var(--spacing-md);
-      z-index: 2;
+      z-index: 3;
       color: #f7f8fb;
     }
 
@@ -1021,6 +1097,147 @@
       font-size: var(--font-size-sm);
       line-height: 1.5;
       text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      overflow: hidden;
+    }
+
+    .cover-expand-btn {
+      position: absolute;
+      top: var(--spacing-sm);
+      right: var(--spacing-sm);
+      z-index: 4;
+      width: 34px;
+      height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255, 255, 255, .28);
+      border-radius: 50%;
+      background: rgba(18, 20, 24, .42);
+      color: white;
+      backdrop-filter: blur(5px);
+      cursor: pointer;
+      transition: transform .18s ease, background .18s ease;
+    }
+
+    .cover-expand-btn:hover,
+    .cover-expand-btn:focus-visible {
+      background: rgba(18, 20, 24, .7);
+      transform: scale(1.05);
+      outline: none;
+    }
+
+    .cover-broken-state {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: var(--spacing-xs);
+      background: color-mix(in srgb, var(--card) 94%, var(--bg));
+      color: var(--muted);
+      z-index: 5;
+    }
+
+    .overlay-image-wrap.is-broken .card-image,
+    .overlay-image-wrap.is-broken::after,
+    .overlay-image-wrap.is-broken .image-preview-overlay,
+    .overlay-image-wrap.is-broken .cover-expand-btn,
+    .overlay-image-wrap.is-broken .cover-image-hit {
+      display: none;
+    }
+
+    .overlay-image-wrap.is-broken .cover-broken-state {
+      display: flex;
+    }
+
+    .cover-lightbox[hidden] {
+      display: none;
+    }
+
+    .cover-lightbox {
+      --lightbox-gap: clamp(24px, 5vw, 72px);
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: grid;
+      place-items: center;
+      box-sizing: border-box;
+      width: 100%;
+      height: 100vh;
+      height: 100dvh;
+      padding: var(--lightbox-gap);
+      overflow: hidden;
+      background: rgba(7, 8, 11, .96);
+      animation: coverLightboxIn .18s ease-out;
+    }
+
+    .cover-lightbox img {
+      display: block;
+      width: auto;
+      height: auto;
+      max-width: calc(100vw - var(--lightbox-gap) - var(--lightbox-gap));
+      max-height: calc(100vh - var(--lightbox-gap) - var(--lightbox-gap));
+      max-height: calc(100dvh - var(--lightbox-gap) - var(--lightbox-gap));
+      object-fit: contain;
+      border-radius: var(--radius-lg);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, .45);
+    }
+
+    .cover-lightbox-close {
+      position: fixed;
+      top: max(20px, env(safe-area-inset-top));
+      right: max(20px, env(safe-area-inset-right));
+      width: 42px;
+      height: 42px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255, 255, 255, .25);
+      border-radius: 50%;
+      background: rgba(255, 255, 255, .1);
+      color: white;
+      cursor: pointer;
+    }
+
+    @keyframes coverLightboxIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .cover-lightbox {
+        animation: none;
+      }
+    }
+
+    @media (min-width: 769px) {
+      #promptList.list-view .legacy-card.has-cover {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 220px;
+        column-gap: var(--spacing-xl);
+      }
+
+      #promptList.list-view .legacy-card .media-image-wrap {
+        grid-column: 2;
+        grid-row: 1 / span 3;
+        margin-top: 0;
+        align-self: stretch;
+      }
+
+      #promptList.list-view .legacy-card .media-image-wrap .card-image {
+        height: 100%;
+        min-height: 150px;
+      }
+
+      #promptList.list-view .legacy-card .image-preview-overlay {
+        left: var(--spacing-sm);
+        right: var(--spacing-sm);
+        bottom: var(--spacing-sm);
+      }
     }
 
     .legacy-card .overlay-image-wrap .copy-preview-btn {
@@ -1079,27 +1296,36 @@
       }
       
       .search-controls {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
         gap: var(--spacing-sm);
-        flex-wrap: nowrap;
         width: 100%;
       }
       
-      .sort-select {
-        flex: 3;
+      .search-controls .sort-select {
+        width: 100%;
         min-width: 0;
         font-size: var(--font-size-sm);
+      }
+
+      .filter-select {
+        width: 100%;
+        min-width: 0;
+        flex: none;
       }
       
       .search-btn {
-        flex: 1;
-        padding: var(--spacing-md);
+        width: auto;
+        min-width: max-content;
+        height: 48px;
+        padding: var(--spacing-sm) var(--spacing-md);
         font-size: var(--font-size-sm);
-        min-width: 0;
       }
       
       .search-input-wrapper {
+        flex: 0 0 auto;
         width: 100%;
-        min-width: auto;
+        min-width: 0;
       }
       
       .search-input-wrapper input {
@@ -1234,9 +1460,13 @@
       // 构建查询并跳转
       function applyFilters() {
         const params = new URLSearchParams(window.location.search);
-        // 保留 q/sort
-        const keep = { q: params.get('q') || '', sort: params.get('sort') || '' };
-        params.forEach((_, k) => { if (!['q','sort'].includes(k)) params.delete(k); });
+        // 保留搜索、排序与封面筛选
+        const keep = {
+          q: params.get('q') || '',
+          sort: params.get('sort') || '',
+          cover: params.get('cover') || ''
+        };
+        params.forEach((_, k) => { if (!['q','sort','cover'].includes(k)) params.delete(k); });
 
         // tags
         const tags = Array.from(document.querySelectorAll('input[name="ftag"]:checked')).map(i => i.value);
@@ -1247,6 +1477,7 @@
 
         if (keep.q) params.set('q', keep.q);
         if (keep.sort) params.set('sort', keep.sort);
+        if (keep.cover && keep.cover !== 'all') params.set('cover', keep.cover);
         const url = `${window.location.pathname}?${params.toString()}`;
         window.location.assign(url);
       }
@@ -1272,8 +1503,11 @@
       const clearBtn = document.getElementById('clearFiltersBtn');
       if (clearBtn) {
         clearBtn.addEventListener('click', () => {
-          document.querySelectorAll('input[name="ftag"], input[name="fsrc"]').forEach(i => i.checked = false);
-          applyFilters();
+          const params = new URLSearchParams();
+          const sort = new URLSearchParams(window.location.search).get('sort');
+          if (sort) params.set('sort', sort);
+          const query = params.toString();
+          window.location.assign(query ? `${window.location.pathname}?${query}` : window.location.pathname);
         });
       }
 
@@ -1320,6 +1554,109 @@
           btn.innerHTML = '<i class="fas fa-table-cells"></i>';
         }
       }
+    })();
+
+    (function setupCoverLightbox() {
+      const lightbox = document.getElementById('coverLightbox');
+      const lightboxImage = document.getElementById('coverLightboxImage');
+      const closeButton = lightbox?.querySelector('.cover-lightbox-close');
+      if (!lightbox || !lightboxImage || !closeButton) return;
+      let previousFocus = null;
+      let loadingTrigger = null;
+      let openRequestId = 0;
+      const coverCache = new Map();
+
+      function setLoading(trigger, loading) {
+        if (!trigger) return;
+        const icon = trigger.querySelector('.cover-expand-btn i');
+        trigger.setAttribute('aria-busy', loading ? 'true' : 'false');
+        if (icon) {
+          icon.className = loading ? 'fas fa-spinner fa-spin' : 'fas fa-expand';
+        }
+      }
+
+      function preloadCover(url) {
+        if (coverCache.has(url)) return coverCache.get(url);
+
+        const loadPromise = new Promise((resolve, reject) => {
+          const image = new Image();
+          image.onload = async () => {
+            try {
+              if (typeof image.decode === 'function') await image.decode();
+            } catch (_) {
+              // onload 已确认图片可用；个别浏览器可能仍拒绝 decode()。
+            }
+            resolve(url);
+          };
+          image.onerror = reject;
+          image.src = url;
+        });
+
+        coverCache.set(url, loadPromise);
+        loadPromise.catch(() => coverCache.delete(url));
+        return loadPromise;
+      }
+
+      async function open(trigger) {
+        const url = trigger.dataset.coverUrl;
+        if (!url || trigger.classList.contains('is-broken')) return;
+        const requestId = ++openRequestId;
+
+        setLoading(loadingTrigger, false);
+        loadingTrigger = trigger;
+        setLoading(trigger, true);
+        previousFocus = document.activeElement;
+
+        try {
+          await preloadCover(url);
+          if (requestId !== openRequestId) return;
+
+          lightboxImage.src = url;
+          lightboxImage.alt = trigger.dataset.coverAlt || '';
+          lightbox.hidden = false;
+          lightbox.setAttribute('aria-hidden', 'false');
+          document.body.style.overflow = 'hidden';
+          closeButton.focus();
+        } catch (_) {
+          if (requestId === openRequestId) {
+            trigger.classList.add('is-broken');
+          }
+        } finally {
+          if (requestId === openRequestId) {
+            setLoading(loadingTrigger, false);
+            loadingTrigger = null;
+          }
+        }
+      }
+
+      function close() {
+        openRequestId += 1;
+        setLoading(loadingTrigger, false);
+        loadingTrigger = null;
+        lightbox.hidden = true;
+        lightbox.setAttribute('aria-hidden', 'true');
+        lightboxImage.removeAttribute('src');
+        document.body.style.overflow = '';
+        previousFocus?.focus();
+      }
+
+      document.querySelectorAll('.cover-lightbox-trigger').forEach(trigger => {
+        const image = trigger.querySelector('.card-image');
+        image?.addEventListener('error', () => trigger.classList.add('is-broken'));
+        trigger.querySelector('.cover-image-hit')?.addEventListener('click', () => open(trigger));
+        trigger.querySelector('.cover-expand-btn')?.addEventListener('click', () => open(trigger));
+      });
+      closeButton.addEventListener('click', close);
+      lightbox.addEventListener('click', event => {
+        if (event.target === lightbox) close();
+      });
+      document.addEventListener('keydown', event => {
+        if (!lightbox.hidden && event.key === 'Escape') close();
+        if (!lightbox.hidden && event.key === 'Tab') {
+          event.preventDefault();
+          closeButton.focus();
+        }
+      });
     })();
 
     async function copyPreviewContent(button) {

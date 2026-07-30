@@ -11,6 +11,9 @@ Default is Chinese. You can switch to English in the "设置-语言-英文" at t
 
 ### 📝 Prompt Management
 - Create & edit: name, source, tags, notes and more
+- One cover per prompt, stored as normalized files with a separate thumbnail
+- JPEG, PNG, or static WebP up to 5MB; real image decoding, EXIF orientation, and metadata removal
+- Legacy Base64 covers migrate automatically on startup
 - Content preview: show summary on home; one-click copy full content
 - Pin important prompts for quick access
 - Smart search across name, source, notes, tags and content
@@ -41,9 +44,11 @@ Default is Chinese. You can switch to English in the "设置-语言-英文" at t
 - Desktop view toggle (grid/list) with preference remembered
 - Prompt color accents (new): set a color in “Advanced Settings” (#RGB/#RRGGBB). Home cards show a subtle ring; includes color picker, swatch preview, and “clear” button. Empty = unset
 - UI language (new): switch UI language in Settings (Chinese/English), default Chinese
+- Cover cards retain a two-line text overlay, support focal positioning, compact list thumbnails, and an accessible full-image lightbox
 
 ### 📤 Data
-- Import/Export full backup in JSON
+- ZIP (`manifest.json + images/`) is the recommended complete backup format
+- JSON/CSV remain compatible and carry covers as Base64
 - Local SQLite only (no cloud dependency)
 - Settings management: version cleanup threshold, access password, and UI language
 
@@ -150,8 +155,9 @@ Notes
 ```
 prompt/
 ├── app.py              # Flask app
+├── cover_images.py     # Cover validation, normalization, and storage
 ├── requirements.txt    # Python deps
-├── data.sqlite3        # Optional local DB (via DB_PATH)
+├── data/               # SQLite DB and uploads/covers
 ├── Dockerfile          # Docker image config
 ├── docker-compose.yml  # Docker Compose config
 ├── .dockerignore       # Docker build ignore
@@ -163,6 +169,7 @@ prompt/
 │   ├── diff.html
 │   ├── settings.html
 │   └── auth.html
+├── tests/              # Cover and Flask integration tests
 ├── static/             # Static assets
 │   ├── css/
 │   │   └── style.css
@@ -174,7 +181,7 @@ prompt/
 ## 🗄️ Database
 
 Tables
-- prompts: id, name, source, notes, color, tags, pinned, created_at, updated_at, current_version_id, require_password
+- prompts: metadata plus `cover_file`, `cover_thumb`, MIME, dimensions, focal point, and alternative text
 - versions: id, prompt_id, version, content, created_at, parent_version_id
 - settings: key, value
   - Keys:
@@ -195,6 +202,10 @@ Export example
       "notes": "Standard replies for customer support",
       "color": "#409eff",
       "tags": ["Scene/Support", "Business/After-sales"],
+      "image_data": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...",
+      "cover_alt": "Support workspace cover",
+      "cover_focus_x": 50,
+      "cover_focus_y": 50,
       "pinned": true,
       "require_password": false,
       "created_at": "2024-01-01T00:00:00",

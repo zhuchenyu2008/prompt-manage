@@ -134,9 +134,16 @@
                 <h4>{{ t('导出数据') }}</h4>
               </div>
               <p class="action-description">
-                {{ t('将所有提示词和版本历史导出为 JSON 或 CSV 格式文件') }}
+                {{ t('将所有提示词和版本历史导出为 JSON、CSV 或 ZIP 格式文件') }}
               </p>
-              <a href="{{ url_for('export_all', format='json') }}" class="btn primary export-btn">
+              <p class="action-description">
+                {{ t('ZIP 包含图片文件，是推荐的完整备份格式。JSON/CSV 为兼容格式，图片会增加文件体积。') }}
+              </p>
+              <a href="{{ url_for('export_all', format='zip') }}" class="btn primary export-btn">
+                <i class="fas fa-file-zipper"></i>
+                {{ t('导出 ZIP（推荐）') }}
+              </a>
+              <a href="{{ url_for('export_all', format='json') }}" class="btn ghost export-btn export-btn-secondary">
                 <i class="fas fa-file-export"></i>
                 {{ t('导出 JSON') }}
               </a>
@@ -157,8 +164,8 @@
               </p>
               <label class="upload-btn">
                 <i class="fas fa-file-import"></i>
-                {{ t('选择 JSON/CSV 文件') }}
-                <input id="importFileInput" type="file" name="import_file" accept=".json,.csv,application/json,text/csv" />
+                {{ t('选择 ZIP/JSON/CSV 文件') }}
+                <input id="importFileInput" type="file" name="import_file" accept=".zip,.json,.csv,application/zip,application/json,text/csv" />
               </label>
               <div id="importFileStatus" class="import-file-status" aria-live="polite">
                 <span class="empty">{{ t('未选择文件') }}</span>
@@ -543,7 +550,7 @@
         selected: {{ t('已选择文件：')|tojson }},
         none: {{ t('未选择文件')|tojson }},
         size: {{ t('文件大小：')|tojson }},
-        invalid: {{ t('导入失败：仅支持 JSON 或 CSV 文件')|tojson }}
+        invalid: {{ t('导入失败：仅支持 ZIP、JSON 或 CSV 文件')|tojson }}
       };
 
       const fmtSize = (bytes) => {
@@ -572,7 +579,7 @@
           return;
         }
 
-        const ok = /\.(json|csv)$/i.test(file.name || '');
+        const ok = /\.(zip|json|csv)$/i.test(file.name || '');
         status.classList.toggle('valid', ok);
         status.classList.toggle('invalid', !ok);
 

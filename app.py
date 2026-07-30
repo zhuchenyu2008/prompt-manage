@@ -1,23 +1,41 @@
 import json
 import os
 import sqlite3
-import base64
 import csv
+import logging
+import zipfile
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file, jsonify, session
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.exceptions import BadRequest
-from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from io import BytesIO, StringIO
 import hashlib
 import re
 import secrets
 import time
+from cover_images import (
+    CoverImageError,
+    MAX_IMAGE_SIZE,
+    decode_data_url,
+    delete_cover_files,
+    encode_data_url,
+    ensure_cover_dir,
+    normalize_cover,
+    read_limited,
+    remove_unreferenced_files,
+    resolve_cover_path,
+    store_cover,
+)
 
 
 # Database path: allow override via env, default to container volume
 DB_PATH = os.environ.get('DB_PATH', '/app/data/data.sqlite3')
+COVER_DIR = os.environ.get(
+    'COVER_DIR',
+    os.path.join(os.path.dirname(DB_PATH) or '.', 'uploads', 'covers'),
+)
+logger = logging.getLogger(__name__)
 
 
 def get_db():
@@ -39,6 +57,14 @@ def init_db():
             color TEXT,
             tags TEXT,
             image_data TEXT,
+            cover_file TEXT,
+            cover_thumb TEXT,
+            cover_mime TEXT,
+            cover_width INTEGER,
+            cover_height INTEGER,
+            cover_focus_x REAL DEFAULT 50,
+            cover_focus_y REAL DEFAULT 50,
+            cover_alt TEXT,
             pinned INTEGER DEFAULT 0,
             created_at TEXT,
             updated_at TEXT,
@@ -78,6 +104,7 @@ def init_db():
     cur.execute("INSERT OR IGNORE INTO settings(key, value) VALUES('language', 'zh')")
     conn.commit()
     conn.close()
+    ensure_cover_dir(COVER_DIR)
 
 
 def now_ts():
@@ -199,6 +226,20 @@ def migrate_schema():
         cols = [r['name'] for r in cur.execute('PRAGMA table_info(prompts)').fetchall()]
         if 'image_data' not in cols:
             cur.execute("ALTER TABLE prompts ADD COLUMN image_data TEXT")
+        cover_columns = {
+            'cover_file': 'TEXT',
+            'cover_thumb': 'TEXT',
+            'cover_mime': 'TEXT',
+            'cover_width': 'INTEGER',
+            'cover_height': 'INTEGER',
+            'cover_focus_x': 'REAL DEFAULT 50',
+            'cover_focus_y': 'REAL DEFAULT 50',
+            'cover_alt': 'TEXT',
+        }
+        cols = [r['name'] for r in cur.execute('PRAGMA table_info(prompts)').fetchall()]
+        for column, definition in cover_columns.items():
+            if column not in cols:
+                cur.execute(f"ALTER TABLE prompts ADD COLUMN {column} {definition}")
         # ensure auth settings keys exist
         cur.execute("INSERT OR IGNORE INTO settings(key, value) VALUES('auth_mode', 'off')")
         cur.execute("INSERT OR IGNORE INTO settings(key, value) VALUES('auth_password_hash', '')")
@@ -206,9 +247,10 @@ def migrate_schema():
         # ensure language setting exists
         cur.execute("INSERT OR IGNORE INTO settings(key, value) VALUES('language', 'zh')")
         conn.commit()
+        ensure_cover_dir(COVER_DIR)
+        migrate_legacy_covers(conn)
     except Exception:
-        # ignore migration failures to avoid blocking the app
-        pass
+        logger.exception("Schema or cover migration failed")
     finally:
         try:
             conn.close()
@@ -287,14 +329,16 @@ TRANSLATIONS = {
         '数据导入 / 导出': 'Import / Export',
         '导出数据': 'Export data',
         '将所有提示词和版本历史导出为 JSON 格式文件': 'Export all prompts and version history as a JSON file',
-        '将所有提示词和版本历史导出为 JSON 或 CSV 格式文件': 'Export all prompts and version history as JSON or CSV',
+        '将所有提示词和版本历史导出为 JSON、CSV 或 ZIP 格式文件': 'Export all prompts and version history as JSON, CSV, or ZIP',
+        'ZIP 包含图片文件，是推荐的完整备份格式。JSON/CSV 为兼容格式，图片会增加文件体积。': 'ZIP includes image files and is the recommended full backup. JSON/CSV are compatibility formats and images increase file size.',
         '导出全部数据': 'Export all data',
+        '导出 ZIP（推荐）': 'Export ZIP (recommended)',
         '导出 JSON': 'Export JSON',
         '导出 CSV': 'Export CSV',
         '导入数据': 'Import data',
         '导入将覆盖所有现有数据，请谨慎操作': 'Import will overwrite all existing data. Proceed with caution.',
         '选择 JSON 文件': 'Choose JSON file',
-        '选择 JSON/CSV 文件': 'Choose JSON/CSV file',
+        '选择 ZIP/JSON/CSV 文件': 'Choose ZIP/JSON/CSV file',
         '已选择文件：': 'Selected file: ',
         '未选择文件': 'No file selected',
         '文件大小：': 'File size: ',
@@ -328,7 +372,10 @@ TRANSLATIONS = {
         '已导入并覆盖所有数据': 'Imported and overwrote all data',
         '导入失败：上传表单解析错误': 'Import failed: invalid upload form data',
         '导入失败：JSON 格式无效': 'Import failed: invalid JSON',
-        '导入失败：仅支持 JSON 或 CSV 文件': 'Import failed: only JSON or CSV is supported',
+        '导入失败：仅支持 ZIP、JSON 或 CSV 文件': 'Import failed: only ZIP, JSON, or CSV is supported',
+        '导入失败：ZIP 备份无效': 'Import failed: invalid ZIP backup',
+        '导入失败：封面图片数据无效': 'Import failed: invalid cover image data',
+        '导入失败：封面图片 Base64 无效': 'Import failed: invalid cover image Base64',
         '导入失败：CSV 文件编码无效，请使用 UTF-8': 'Import failed: invalid CSV encoding, please use UTF-8',
         '导入失败：CSV 格式无效': 'Import failed: invalid CSV format',
         '导入失败，请重试': 'Import failed, please try again',
@@ -353,6 +400,10 @@ TRANSLATIONS = {
         '筛选': 'Filters',
         '收起筛选': 'Collapse filters',
         '全部': 'All',
+        '封面': 'Cover',
+        '全部封面': 'All covers',
+        '有封面': 'With cover',
+        '无封面': 'Without cover',
         '暂无标签': 'No tags',
         '来源': 'Source',
         '未设置': 'Not set',
@@ -380,9 +431,26 @@ TRANSLATIONS = {
         '支持 jpg/jpeg/png/webp，最大 5MB。': 'Supports jpg/jpeg/png/webp, max 5MB.',
         '当前图片': 'Current image',
         '移除当前图片': 'Remove current image',
+        '替换封面': 'Replace cover',
+        '拖放、粘贴或点击选择图片': 'Drop, paste, or click to choose an image',
+        '拖动图片可调整封面焦点': 'Drag the image to adjust its focal point',
+        '撤销移除': 'Undo removal',
+        '封面说明': 'Cover description',
+        '用于图片替代文本，可选': 'Optional alternative text for the image',
+        '封面图片不参与版本历史。': 'Cover images are not included in version history.',
+        '重新上传': 'Upload again',
+        '查看完整封面': 'View full cover',
+        '关闭图片预览': 'Close image preview',
+        '图片加载失败': 'Image failed to load',
+        '格式：': 'Format: ',
+        '尺寸：': 'Dimensions: ',
         '图片上传失败：仅支持 jpg/jpeg/png/webp 格式': 'Image upload failed: only jpg/jpeg/png/webp are supported',
         '图片上传失败：文件大小不能超过 5MB': 'Image upload failed: file size must be <= 5MB',
         '图片上传失败：图片不能为空': 'Image upload failed: image file is empty',
+        '图片上传失败：暂不支持动画 WebP': 'Image upload failed: animated WebP is not supported',
+        '图片上传失败：图片尺寸无效': 'Image upload failed: invalid image dimensions',
+        '图片上传失败：图片像素不能超过 4000 万': 'Image upload failed: image pixels cannot exceed 40 million',
+        '图片上传失败：图片文件已损坏或格式无效': 'Image upload failed: the image is corrupt or invalid',
 
         # 详情/编辑 prompt_detail
         '提示词编辑': 'Edit Prompt',
@@ -544,37 +612,102 @@ def sanitize_color(val):
     return None
 
 
-ALLOWED_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp'}
-ALLOWED_IMAGE_MIME = {'image/jpeg', 'image/jpg', 'image/png', 'image/webp'}
-MAX_IMAGE_SIZE = 5 * 1024 * 1024
+def clamp_focus(value, default=50.0):
+    try:
+        return max(0.0, min(100.0, float(value)))
+    except (TypeError, ValueError):
+        return default
 
 
-def parse_image_upload(req):
-    """Parse one optional image upload and return (image_data, remove_image, error_text)."""
+def parse_cover_upload(req):
+    """Return (normalized_asset, remove_cover, error_text)."""
     remove_image = req.form.get('remove_image') == '1'
     f = req.files.get('image_file')
     if not f or not f.filename:
         return None, remove_image, None
+    try:
+        raw = read_limited(f.stream)
+        return normalize_cover(raw), False, None
+    except CoverImageError as exc:
+        return None, remove_image, str(exc)
 
-    filename = secure_filename(f.filename)
-    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
-    if ext not in ALLOWED_IMAGE_EXTENSIONS:
-        return None, remove_image, '图片上传失败：仅支持 jpg/jpeg/png/webp 格式'
 
-    mime = (f.mimetype or '').lower()
-    if mime not in ALLOWED_IMAGE_MIME:
-        return None, remove_image, '图片上传失败：仅支持 jpg/jpeg/png/webp 格式'
-    if mime == 'image/jpg':
-        mime = 'image/jpeg'
+def cover_filenames(row):
+    if not row:
+        return []
+    keys = row.keys() if hasattr(row, 'keys') else row
+    return [
+        row.get('cover_file') if isinstance(row, dict) else row['cover_file'],
+        row.get('cover_thumb') if isinstance(row, dict) else row['cover_thumb'],
+    ] if 'cover_file' in keys else []
 
-    raw = f.read()
-    if not raw:
-        return None, remove_image, '图片上传失败：图片不能为空'
-    if len(raw) > MAX_IMAGE_SIZE:
-        return None, remove_image, '图片上传失败：文件大小不能超过 5MB'
 
-    encoded = base64.b64encode(raw).decode('ascii')
-    return f"data:{mime};base64,{encoded}", remove_image, None
+def migrate_legacy_covers(conn):
+    """Idempotently move valid legacy Base64 covers into filesystem storage."""
+    rows = conn.execute(
+        """
+        SELECT id, image_data
+        FROM prompts
+        WHERE image_data IS NOT NULL AND image_data != ''
+          AND (cover_file IS NULL OR cover_file = '')
+        """
+    ).fetchall()
+    for row in rows:
+        stored = None
+        try:
+            asset = normalize_cover(decode_data_url(row['image_data']))
+            stored = store_cover(asset, COVER_DIR)
+            conn.execute(
+                """
+                UPDATE prompts
+                SET cover_file=?, cover_thumb=?, cover_mime=?, cover_width=?,
+                    cover_height=?, cover_focus_x=50, cover_focus_y=50,
+                    image_data=NULL
+                WHERE id=?
+                """,
+                (
+                    stored['cover_file'],
+                    stored['cover_thumb'],
+                    stored['cover_mime'],
+                    stored['cover_width'],
+                    stored['cover_height'],
+                    row['id'],
+                ),
+            )
+            conn.commit()
+        except Exception as exc:
+            if stored:
+                delete_cover_files(COVER_DIR, cover_filenames(stored))
+            conn.rollback()
+            logger.warning("Could not migrate legacy cover for prompt %s: %s", row['id'], exc)
+
+
+def read_cover_bytes(row):
+    """Read a stored cover, falling back to a still-unmigrated data URL."""
+    if row and 'cover_file' in row.keys() and row['cover_file']:
+        path = resolve_cover_path(COVER_DIR, row['cover_file'])
+        if path and os.path.isfile(path):
+            with open(path, 'rb') as image_file:
+                return image_file.read(), row['cover_mime'] or 'application/octet-stream'
+    if row and 'image_data' in row.keys() and row['image_data']:
+        raw = decode_data_url(row['image_data'])
+        prefix = row['image_data'].partition(',')[0]
+        mime = prefix[5:].split(';', 1)[0] if prefix.lower().startswith('data:') else 'application/octet-stream'
+        return raw, mime
+    return None, None
+
+
+def cleanup_unreferenced_covers(conn):
+    rows = conn.execute(
+        "SELECT cover_file, cover_thumb FROM prompts WHERE cover_file IS NOT NULL OR cover_thumb IS NOT NULL"
+    ).fetchall()
+    referenced = {
+        filename
+        for row in rows
+        for filename in (row['cover_file'], row['cover_thumb'])
+        if filename
+    }
+    remove_unreferenced_files(COVER_DIR, referenced)
 
 
 def parse_bool_value(val):
@@ -600,6 +733,31 @@ def parse_json_text(val, default):
 
 def load_import_payload(upload_file):
     filename = (upload_file.filename or '').lower()
+    if filename.endswith('.zip'):
+        try:
+            with zipfile.ZipFile(upload_file.stream) as archive:
+                names = archive.namelist()
+                if 'manifest.json' not in names:
+                    raise ValueError('导入失败：ZIP 备份无效')
+                manifest_info = archive.getinfo('manifest.json')
+                if manifest_info.file_size > 10 * 1024 * 1024:
+                    raise ValueError('导入失败：ZIP 备份无效')
+                for name in names:
+                    normalized = name.replace('\\', '/')
+                    if normalized.startswith('/') or '..' in normalized.split('/'):
+                        raise ValueError('导入失败：ZIP 备份无效')
+                    if name.startswith('images/') and not name.endswith('/'):
+                        if archive.getinfo(name).file_size > MAX_IMAGE_SIZE:
+                            raise CoverImageError('图片上传失败：文件大小不能超过 5MB')
+                data = json.loads(archive.read('manifest.json').decode('utf-8-sig'))
+                data['_zip_images'] = {
+                    name: archive.read(name)
+                    for name in names
+                    if name.startswith('images/') and not name.endswith('/')
+                }
+            return data
+        except (zipfile.BadZipFile, KeyError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError('导入失败：ZIP 备份无效') from exc
     if filename.endswith('.json'):
         return json.load(upload_file.stream)
     if filename.endswith('.csv'):
@@ -633,6 +791,9 @@ def load_import_payload(upload_file):
                     'color': row.get('color'),
                     'tags': tags,
                     'image_data': row.get('image_data'),
+                    'cover_alt': row.get('cover_alt'),
+                    'cover_focus_x': row.get('cover_focus_x'),
+                    'cover_focus_y': row.get('cover_focus_y'),
                     'pinned': parse_bool_value(row.get('pinned')),
                     'require_password': parse_bool_value(row.get('require_password')),
                     'created_at': row.get('created_at'),
@@ -645,14 +806,129 @@ def load_import_payload(upload_file):
             raise ValueError('导入失败：CSV 格式无效') from e
         except csv.Error as e:
             raise ValueError('导入失败：CSV 格式无效') from e
-    raise ValueError('导入失败：仅支持 JSON 或 CSV 文件')
+    raise ValueError('导入失败：仅支持 ZIP、JSON 或 CSV 文件')
 
 
-def collect_export_payload(conn):
+def prepare_import_payload(data):
+    if isinstance(data, dict) and 'prompts' in data:
+        prompts = data['prompts']
+        zip_images = data.get('_zip_images') or {}
+    else:
+        prompts = data
+        zip_images = {}
+    if not isinstance(prompts, list):
+        raise ValueError('导入失败：JSON 格式无效')
+
+    prepared = []
+    for prompt in prompts:
+        if not isinstance(prompt, dict):
+            continue
+        item = dict(prompt)
+        cover = prompt.get('cover') if isinstance(prompt.get('cover'), dict) else {}
+        raw = None
+        if cover.get('file'):
+            raw = zip_images.get(cover['file'])
+            if raw is None:
+                raise ValueError('导入失败：ZIP 备份无效')
+        elif prompt.get('image_data'):
+            raw = decode_data_url(prompt['image_data'])
+        item['_cover_asset'] = normalize_cover(raw) if raw is not None else None
+        item['_cover_alt'] = cover.get('alt', prompt.get('cover_alt'))
+        item['_cover_focus_x'] = clamp_focus(cover.get('focus_x', prompt.get('cover_focus_x')))
+        item['_cover_focus_y'] = clamp_focus(cover.get('focus_y', prompt.get('cover_focus_y')))
+        prepared.append(item)
+    return prepared
+
+
+def apply_import_payload(conn, data):
+    """Validate everything first, then atomically replace database content."""
+    prepared = prepare_import_payload(data)
+    created_files = []
+    committed = False
+    try:
+        for prompt in prepared:
+            asset = prompt.get('_cover_asset')
+            stored = store_cover(asset, COVER_DIR) if asset else {}
+            prompt['_stored_cover'] = stored
+            created_files.extend(cover_filenames(stored))
+
+        conn.execute("BEGIN")
+        conn.execute("DELETE FROM versions")
+        conn.execute("DELETE FROM prompts")
+        for prompt in prepared:
+            stored = prompt.get('_stored_cover') or {}
+            conn.execute(
+                """
+                INSERT INTO prompts(
+                    id, name, source, notes, color, tags, image_data,
+                    cover_file, cover_thumb, cover_mime, cover_width, cover_height,
+                    cover_focus_x, cover_focus_y, cover_alt,
+                    pinned, created_at, updated_at, current_version_id, require_password
+                ) VALUES(?,?,?,?,?,?,NULL,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    prompt.get('id'),
+                    prompt.get('name') or '未命名提示词',
+                    prompt.get('source'),
+                    prompt.get('notes'),
+                    sanitize_color(prompt.get('color')),
+                    json.dumps(prompt.get('tags') or [], ensure_ascii=False),
+                    stored.get('cover_file'),
+                    stored.get('cover_thumb'),
+                    stored.get('cover_mime'),
+                    stored.get('cover_width'),
+                    stored.get('cover_height'),
+                    prompt.get('_cover_focus_x', 50),
+                    prompt.get('_cover_focus_y', 50),
+                    (prompt.get('_cover_alt') or '').strip() or None,
+                    1 if prompt.get('pinned') else 0,
+                    prompt.get('created_at') or now_ts(),
+                    prompt.get('updated_at') or now_ts(),
+                    None,
+                    1 if prompt.get('require_password') else 0,
+                ),
+            )
+            pid = conn.execute("SELECT last_insert_rowid() AS id").fetchone()['id'] if prompt.get('id') is None else prompt.get('id')
+            for version in (prompt.get('versions') or []):
+                if not isinstance(version, dict):
+                    continue
+                conn.execute(
+                    "INSERT INTO versions(id, prompt_id, version, content, created_at, parent_version_id) VALUES(?,?,?,?,?,?)",
+                    (
+                        version.get('id'),
+                        pid,
+                        version.get('version') or '1.0.0',
+                        version.get('content') or '',
+                        version.get('created_at') or now_ts(),
+                        version.get('parent_version_id'),
+                    ),
+                )
+            compute_current_version(conn, pid)
+        conn.commit()
+        committed = True
+    except Exception:
+        conn.rollback()
+        delete_cover_files(COVER_DIR, created_files)
+        raise
+    if committed:
+        try:
+            cleanup_unreferenced_covers(conn)
+        except OSError:
+            logger.exception("Could not clean unreferenced cover files after import")
+
+
+def collect_export_payload(conn, include_image_data=True):
     prompts = conn.execute("SELECT * FROM prompts ORDER BY id ASC").fetchall()
     result = []
     for p in prompts:
         versions = conn.execute("SELECT * FROM versions WHERE prompt_id=? ORDER BY created_at ASC", (p['id'],)).fetchall()
+        image_data = None
+        if include_image_data:
+            try:
+                raw, mime_type = read_cover_bytes(p)
+                image_data = encode_data_url(raw, mime_type) if raw else None
+            except CoverImageError:
+                image_data = None
         result.append({
             'id': p['id'],
             'name': p['name'],
@@ -660,7 +936,10 @@ def collect_export_payload(conn):
             'notes': p['notes'],
             'color': p['color'],
             'tags': json.loads(p['tags']) if p['tags'] else [],
-            'image_data': p['image_data'] if 'image_data' in p.keys() else None,
+            'image_data': image_data,
+            'cover_alt': p['cover_alt'] if 'cover_alt' in p.keys() else None,
+            'cover_focus_x': p['cover_focus_x'] if 'cover_focus_x' in p.keys() else 50,
+            'cover_focus_y': p['cover_focus_y'] if 'cover_focus_y' in p.keys() else 50,
             'pinned': bool(p['pinned']),
             'require_password': bool(p['require_password']) if 'require_password' in p.keys() else False,
             'created_at': p['created_at'],
@@ -678,6 +957,44 @@ def collect_export_payload(conn):
             ]
         })
     return {'prompts': result}
+
+
+def build_zip_export(conn):
+    data = collect_export_payload(conn, include_image_data=False)
+    rows = {
+        row['id']: row
+        for row in conn.execute("SELECT id, cover_file, cover_mime FROM prompts").fetchall()
+    }
+    output = BytesIO()
+    with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+        for prompt in data['prompts']:
+            row = rows.get(prompt['id'])
+            if not row or not row['cover_file']:
+                continue
+            path = resolve_cover_path(COVER_DIR, row['cover_file'])
+            if not path or not os.path.isfile(path):
+                continue
+            extension = os.path.splitext(row['cover_file'])[1].lower() or '.img'
+            archive_name = f"images/prompt-{prompt['id']}{extension}"
+            with open(path, 'rb') as cover_file:
+                archive.writestr(archive_name, cover_file.read())
+            prompt['cover'] = {
+                'file': archive_name,
+                'alt': prompt.pop('cover_alt', None),
+                'focus_x': prompt.pop('cover_focus_x', 50),
+                'focus_y': prompt.pop('cover_focus_y', 50),
+            }
+        manifest = {
+            'schema_version': 2,
+            'exported_at': now_ts(),
+            'prompts': data['prompts'],
+        }
+        archive.writestr(
+            'manifest.json',
+            json.dumps(manifest, ensure_ascii=False, indent=2).encode('utf-8'),
+        )
+    output.seek(0)
+    return output
 
 
 @app.before_request
@@ -722,12 +1039,51 @@ def favicon():
     return logo_png()
 
 
+@app.route('/prompt/<int:prompt_id>/cover/<variant>')
+def prompt_cover(prompt_id, variant):
+    if variant not in {'thumb', 'full'}:
+        return ('', 404)
+    conn = get_db()
+    prompt = conn.execute(
+        """
+        SELECT id, require_password, cover_file, cover_thumb, cover_mime
+        FROM prompts WHERE id=?
+        """,
+        (prompt_id,),
+    ).fetchone()
+    if not prompt or not prompt['cover_file']:
+        conn.close()
+        return ('', 404)
+    if prompt_requires_unlock(conn, prompt) and not is_prompt_unlocked(conn, prompt_id):
+        conn.close()
+        return ('', 404)
+    auth_mode = get_setting(conn, 'auth_mode', 'off') or 'off'
+    filename = prompt['cover_thumb'] if variant == 'thumb' else prompt['cover_file']
+    path = resolve_cover_path(COVER_DIR, filename)
+    if not path or not os.path.isfile(path):
+        conn.close()
+        return ('', 404)
+    mime_type = 'image/webp' if variant == 'thumb' else prompt['cover_mime']
+    conn.close()
+    response = send_file(path, mimetype=mime_type, conditional=True)
+    if auth_mode != 'off' or prompt['require_password']:
+        response.cache_control.private = True
+        response.cache_control.no_store = True
+    else:
+        response.cache_control.public = True
+        response.cache_control.max_age = 86400
+    return response
+
+
 @app.route('/')
 def index():
     conn = get_db()
     auth_mode = get_setting(conn, 'auth_mode', 'off') or 'off'
     q = request.args.get('q', '').strip()
     sort = request.args.get('sort', 'updated')  # updated|created|name|tags
+    cover_filter = request.args.get('cover', 'all')
+    if cover_filter not in {'all', 'with', 'without'}:
+        cover_filter = 'all'
     # 多选筛选：支持 ?tag=a&tag=b 与 ?tags=a,b，两者合并
     selected_tags = [t for t in request.args.getlist('tag') if t.strip()]
     if not selected_tags and request.args.get('tags'):
@@ -735,27 +1091,39 @@ def index():
     selected_sources = [s for s in request.args.getlist('source') if s.strip()]
     if not selected_sources and request.args.get('sources'):
         selected_sources = [s.strip() for s in request.args.get('sources', '').replace('，', ',').split(',') if s.strip()]
-    order_clause = 'pinned DESC,'
+    order_clause = 'p.pinned DESC,'
     if sort == 'created':
-        order_clause += ' created_at DESC, id DESC'
+        order_clause += ' p.created_at DESC, p.id DESC'
     elif sort == 'name':
-        order_clause += ' name COLLATE NOCASE ASC'
+        order_clause += ' p.name COLLATE NOCASE ASC'
     elif sort == 'tags':
-        order_clause += ' tags COLLATE NOCASE ASC'
+        order_clause += ' p.tags COLLATE NOCASE ASC'
     else:
-        order_clause += ' updated_at DESC, id DESC'
+        order_clause += ' p.updated_at DESC, p.id DESC'
 
     # join 当前版本进行搜索
     sql = f"""
-        SELECT p.*, v.content as current_content, v.version as current_version
+        SELECT
+            p.id, p.name, p.source, p.notes, p.color, p.tags, p.pinned,
+            p.created_at, p.updated_at, p.current_version_id, p.require_password,
+            p.cover_file, p.cover_thumb, p.cover_mime, p.cover_width, p.cover_height,
+            p.cover_focus_x, p.cover_focus_y, p.cover_alt,
+            v.content as current_content, v.version as current_version
         FROM prompts p
         LEFT JOIN versions v ON v.id = p.current_version_id
     """
     params = []
+    conditions = []
     if q:
         like = f"%{q}%"
-        sql += " WHERE (p.name LIKE ? OR p.source LIKE ? OR p.notes LIKE ? OR p.tags LIKE ? OR v.content LIKE ?)"
+        conditions.append("(p.name LIKE ? OR p.source LIKE ? OR p.notes LIKE ? OR p.tags LIKE ? OR v.content LIKE ?)")
         params.extend([like, like, like, like, like])
+    if cover_filter == 'with':
+        conditions.append("p.cover_file IS NOT NULL AND p.cover_file != ''")
+    elif cover_filter == 'without':
+        conditions.append("(p.cover_file IS NULL OR p.cover_file = '')")
+    if conditions:
+        sql += " WHERE " + " AND ".join(conditions)
     sql += f" ORDER BY {order_clause}"
     prompts = conn.execute(sql, params).fetchall()
     # 需要密码且未解锁的提示词（仅在“指定提示词密码”模式下生效）
@@ -835,9 +1203,27 @@ def index():
         source_counts=source_counts,
         selected_tags=selected_tags,
         selected_sources=selected_sources,
+        cover_filter=cover_filter,
         auth_mode=auth_mode,
         locked_ids=list(locked_ids),
     )
+
+
+def render_prompt_editor(conn, prompt=None, versions=None, current=None, auth_mode='off',
+                         form_values=None, image_error=None, status=200):
+    response = render_template(
+        'prompt_detail.html',
+        prompt=prompt,
+        versions=versions or [],
+        current=current,
+        auth_mode=auth_mode,
+        has_password=has_access_password(conn),
+        save_requires_password=save_requires_password(conn, prompt),
+        form_values=form_values or {},
+        form_submitted=form_values is not None,
+        image_error=image_error,
+    )
+    return response, status
 
 
 @app.route('/prompt/new', methods=['GET', 'POST'])
@@ -857,38 +1243,65 @@ def new_prompt():
         content = request.form.get('content', '')
         bump_kind = request.form.get('bump_kind', 'patch')
         require_password = 1 if auth_mode == 'per' and request.form.get('require_password') == '1' else 0
-        image_data, _, image_error = parse_image_upload(request)
+        asset, _, image_error = parse_cover_upload(request)
         if image_error:
+            response = render_prompt_editor(
+                conn,
+                auth_mode=auth_mode,
+                form_values=request.form.to_dict(),
+                image_error=image_error,
+                status=422,
+            )
             conn.close()
-            flash(image_error, 'error')
-            return redirect(url_for('new_prompt'))
+            return response
 
         cur = conn.cursor()
         ts = now_ts()
-        cur.execute(
-            "INSERT INTO prompts(name, source, notes, color, tags, image_data, pinned, created_at, updated_at, require_password) VALUES(?,?,?,?,?,?,0,?,?,?)",
-            (name, source, notes, color, json.dumps(tags, ensure_ascii=False), image_data, ts, ts, require_password)
-        )
-        pid = cur.lastrowid
-        version = bump_version(None, bump_kind)
-        cur.execute(
-            "INSERT INTO versions(prompt_id, version, content, created_at, parent_version_id) VALUES(?,?,?,?,NULL)",
-            (pid, version, content, ts)
-        )
-        vid = cur.lastrowid
-        cur.execute("UPDATE prompts SET current_version_id=? WHERE id=?", (vid, pid))
-        prune_versions(conn, pid)
-        conn.commit()
+        stored = store_cover(asset, COVER_DIR) if asset else {}
+        focus_x = clamp_focus(request.form.get('cover_focus_x'))
+        focus_y = clamp_focus(request.form.get('cover_focus_y'))
+        cover_alt = request.form.get('cover_alt', '').strip() if stored else None
+        try:
+            cur.execute(
+                """
+                INSERT INTO prompts(
+                    name, source, notes, color, tags, image_data,
+                    cover_file, cover_thumb, cover_mime, cover_width, cover_height,
+                    cover_focus_x, cover_focus_y, cover_alt,
+                    pinned, created_at, updated_at, require_password
+                ) VALUES(?,?,?,?,?,NULL,?,?,?,?,?,?,?,?,0,?,?,?)
+                """,
+                (
+                    name, source, notes, color, json.dumps(tags, ensure_ascii=False),
+                    stored.get('cover_file'), stored.get('cover_thumb'), stored.get('cover_mime'),
+                    stored.get('cover_width'), stored.get('cover_height'),
+                    focus_x, focus_y, cover_alt, ts, ts, require_password,
+                )
+            )
+            pid = cur.lastrowid
+            version = bump_version(None, bump_kind)
+            cur.execute(
+                "INSERT INTO versions(prompt_id, version, content, created_at, parent_version_id) VALUES(?,?,?,?,NULL)",
+                (pid, version, content, ts)
+            )
+            vid = cur.lastrowid
+            cur.execute("UPDATE prompts SET current_version_id=? WHERE id=?", (vid, pid))
+            prune_versions(conn, pid)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            delete_cover_files(COVER_DIR, cover_filenames(stored))
+            conn.close()
+            raise
         conn.close()
         flash('已创建提示词并保存首个版本', 'success')
         return redirect(url_for('prompt_detail', prompt_id=pid))
     # 读取认证模式控制复选框可用性
     conn = get_db()
     auth_mode = get_setting(conn, 'auth_mode', 'off') or 'off'
-    password_is_set = has_access_password(conn)
-    save_password_required = save_requires_password(conn)
+    response = render_prompt_editor(conn, auth_mode=auth_mode)
     conn.close()
-    return render_template('prompt_detail.html', prompt=None, versions=[], current=None, auth_mode=auth_mode, has_password=password_is_set, save_requires_password=save_password_required)
+    return response
 
 
 @app.route('/prompt/<int:prompt_id>', methods=['GET', 'POST'])
@@ -920,46 +1333,87 @@ def prompt_detail(prompt_id):
         do_save_version = request.form.get('do_save_version') == '1'
         require_password = 1 if auth_mode == 'per' and request.form.get('require_password') == '1' else 0
         ts = now_ts()
-        new_image_data, remove_image, image_error = parse_image_upload(request)
+        asset, remove_image, image_error = parse_cover_upload(request)
         if image_error:
-            conn.close()
-            flash(image_error, 'error')
-            return redirect(url_for('prompt_detail', prompt_id=prompt_id))
-
-        old_prompt = conn.execute("SELECT image_data FROM prompts WHERE id=?", (prompt_id,)).fetchone()
-        old_image_data = old_prompt['image_data'] if old_prompt else None
-        if new_image_data:
-            final_image_data = new_image_data
-        elif remove_image:
-            final_image_data = None
-        else:
-            final_image_data = old_image_data
-
-        conn.execute("UPDATE prompts SET name=?, source=?, notes=?, color=?, tags=?, image_data=?, updated_at=?, require_password=? WHERE id=?",
-                     (name, source, notes, color, json.dumps(tags, ensure_ascii=False), final_image_data, ts, require_password, prompt_id))
-
-        if do_save_version:
-            # 取当前版本号
-            row = conn.execute("SELECT v.version FROM prompts p LEFT JOIN versions v ON v.id=p.current_version_id WHERE p.id=?",
-                               (prompt_id,)).fetchone()
-            current_ver = row['version'] if row else None
-            new_ver = bump_version(current_ver, bump_kind)
-            conn.execute(
-                "INSERT INTO versions(prompt_id, version, content, created_at, parent_version_id) VALUES(?,?,?,?,(SELECT current_version_id FROM prompts WHERE id=?))",
-                (prompt_id, new_ver, content, ts, prompt_id)
+            versions = conn.execute(
+                "SELECT * FROM versions WHERE prompt_id=? ORDER BY created_at DESC",
+                (prompt_id,),
+            ).fetchall()
+            current = conn.execute(
+                "SELECT * FROM versions WHERE id=?",
+                (prompt_for_auth['current_version_id'],),
+            ).fetchone() if prompt_for_auth['current_version_id'] else None
+            response = render_prompt_editor(
+                conn,
+                prompt=prompt_for_auth,
+                versions=versions,
+                current=current,
+                auth_mode=auth_mode,
+                form_values=request.form.to_dict(),
+                image_error=image_error,
+                status=422,
             )
-            compute_current_version(conn, prompt_id)
-            prune_versions(conn, prompt_id)
-        else:
-            # 如果仅更新元信息，不动 versions，但若没有版本也创建一个
-            row = conn.execute("SELECT COUNT(*) AS c FROM versions WHERE prompt_id=?", (prompt_id,)).fetchone()
-            if row['c'] == 0:
-                conn.execute("INSERT INTO versions(prompt_id, version, content, created_at, parent_version_id) VALUES(?,?,?,?,NULL)",
-                             (prompt_id, '1.0.0', content, ts))
-                compute_current_version(conn, prompt_id)
+            conn.close()
+            return response
 
-        conn.commit()
+        old_files = cover_filenames(prompt_for_auth)
+        stored = store_cover(asset, COVER_DIR) if asset else {}
+        has_cover = bool(stored or (prompt_for_auth['cover_file'] and not remove_image))
+        final_cover = {
+            'cover_file': stored.get('cover_file') if stored else (None if remove_image else prompt_for_auth['cover_file']),
+            'cover_thumb': stored.get('cover_thumb') if stored else (None if remove_image else prompt_for_auth['cover_thumb']),
+            'cover_mime': stored.get('cover_mime') if stored else (None if remove_image else prompt_for_auth['cover_mime']),
+            'cover_width': stored.get('cover_width') if stored else (None if remove_image else prompt_for_auth['cover_width']),
+            'cover_height': stored.get('cover_height') if stored else (None if remove_image else prompt_for_auth['cover_height']),
+        }
+        focus_x = clamp_focus(request.form.get('cover_focus_x'), prompt_for_auth['cover_focus_x'] or 50)
+        focus_y = clamp_focus(request.form.get('cover_focus_y'), prompt_for_auth['cover_focus_y'] or 50)
+        cover_alt = request.form.get('cover_alt', '').strip() if has_cover else None
+
+        try:
+            conn.execute(
+                """
+                UPDATE prompts
+                SET name=?, source=?, notes=?, color=?, tags=?, image_data=NULL,
+                    cover_file=?, cover_thumb=?, cover_mime=?, cover_width=?, cover_height=?,
+                    cover_focus_x=?, cover_focus_y=?, cover_alt=?,
+                    updated_at=?, require_password=?
+                WHERE id=?
+                """,
+                (
+                    name, source, notes, color, json.dumps(tags, ensure_ascii=False),
+                    final_cover['cover_file'], final_cover['cover_thumb'], final_cover['cover_mime'],
+                    final_cover['cover_width'], final_cover['cover_height'],
+                    focus_x, focus_y, cover_alt, ts, require_password, prompt_id,
+                ),
+            )
+
+            if do_save_version:
+                row = conn.execute("SELECT v.version FROM prompts p LEFT JOIN versions v ON v.id=p.current_version_id WHERE p.id=?",
+                                   (prompt_id,)).fetchone()
+                current_ver = row['version'] if row else None
+                new_ver = bump_version(current_ver, bump_kind)
+                conn.execute(
+                    "INSERT INTO versions(prompt_id, version, content, created_at, parent_version_id) VALUES(?,?,?,?,(SELECT current_version_id FROM prompts WHERE id=?))",
+                    (prompt_id, new_ver, content, ts, prompt_id)
+                )
+                compute_current_version(conn, prompt_id)
+                prune_versions(conn, prompt_id)
+            else:
+                row = conn.execute("SELECT COUNT(*) AS c FROM versions WHERE prompt_id=?", (prompt_id,)).fetchone()
+                if row['c'] == 0:
+                    conn.execute("INSERT INTO versions(prompt_id, version, content, created_at, parent_version_id) VALUES(?,?,?,?,NULL)",
+                                 (prompt_id, '1.0.0', content, ts))
+                    compute_current_version(conn, prompt_id)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            delete_cover_files(COVER_DIR, cover_filenames(stored))
+            conn.close()
+            raise
         conn.close()
+        if stored or remove_image:
+            delete_cover_files(COVER_DIR, old_files)
         flash('已保存', 'success')
         return redirect(url_for('prompt_detail', prompt_id=prompt_id))
 
@@ -977,10 +1431,15 @@ def prompt_detail(prompt_id):
             return redirect(url_for('unlock_prompt', prompt_id=prompt_id, next=url_for('prompt_detail', prompt_id=prompt_id)))
     versions = conn.execute("SELECT * FROM versions WHERE prompt_id=? ORDER BY created_at DESC", (prompt_id,)).fetchall()
     current = conn.execute("SELECT * FROM versions WHERE id=?", (prompt['current_version_id'],)).fetchone() if prompt['current_version_id'] else None
-    password_is_set = has_access_password(conn)
-    save_password_required = save_requires_password(conn, prompt)
+    response = render_prompt_editor(
+        conn,
+        prompt=prompt,
+        versions=versions,
+        current=current,
+        auth_mode=auth_mode,
+    )
     conn.close()
-    return render_template('prompt_detail.html', prompt=prompt, versions=versions, current=current, auth_mode=auth_mode, has_password=password_is_set, save_requires_password=save_password_required)
+    return response
 
 
 @app.route('/prompt/<int:prompt_id>/pin', methods=['POST'])
@@ -1004,7 +1463,10 @@ def toggle_pin(prompt_id):
 def delete_prompt(prompt_id):
     # 删除提示词：先删关联版本，再删提示词本身
     conn = get_db()
-    row = conn.execute("SELECT id, name FROM prompts WHERE id=?", (prompt_id,)).fetchone()
+    row = conn.execute(
+        "SELECT id, name, cover_file, cover_thumb FROM prompts WHERE id=?",
+        (prompt_id,),
+    ).fetchone()
     if not row:
         conn.close()
         flash('提示词不存在或已被删除', 'error')
@@ -1028,6 +1490,7 @@ def delete_prompt(prompt_id):
         conn.execute("DELETE FROM versions WHERE prompt_id=?", (prompt_id,))
         conn.execute("DELETE FROM prompts WHERE id=?", (prompt_id,))
         conn.commit()
+        delete_cover_files(COVER_DIR, cover_filenames(row))
         flash('已删除提示词及其所有版本', 'success')
     except Exception:
         conn.rollback()
@@ -1165,59 +1628,14 @@ def settings():
                         return redirect(url_for('settings'))
                     f = files['import_file']
                     data = load_import_payload(f)
-                    # 覆盖所有数据
-                    cur = conn.cursor()
-                    cur.execute("DELETE FROM versions")
-                    cur.execute("DELETE FROM prompts")
-                    # 可包含 settings
-                    if isinstance(data, dict) and 'prompts' in data:
-                        prompts = data['prompts']
-                    else:
-                        prompts = data
-                    if not isinstance(prompts, list):
-                        raise ValueError('导入失败：JSON 格式无效')
-                    for p in prompts:
-                        if not isinstance(p, dict):
-                            continue
-                        cur.execute(
-                            "INSERT INTO prompts(id, name, source, notes, color, tags, image_data, pinned, created_at, updated_at, current_version_id, require_password) VALUES(?,?,?,?,?,?,?,?,?,?,NULL,?)",
-                            (
-                                p.get('id'),
-                                p.get('name'),
-                                p.get('source'),
-                                p.get('notes'),
-                                sanitize_color(p.get('color')),
-                                json.dumps(p.get('tags') or [], ensure_ascii=False),
-                                p.get('image_data'),
-                                1 if p.get('pinned') else 0,
-                                p.get('created_at') or now_ts(),
-                                p.get('updated_at') or now_ts(),
-                                1 if p.get('require_password') else 0,
-                            )
-                        )
-                        pid = cur.lastrowid if p.get('id') is None else p.get('id')
-                        for v in (p.get('versions') or []):
-                            if not isinstance(v, dict):
-                                continue
-                            cur.execute(
-                                "INSERT INTO versions(id, prompt_id, version, content, created_at, parent_version_id) VALUES(?,?,?,?,?,?)",
-                                (
-                                    v.get('id'),
-                                    pid,
-                                    v.get('version'),
-                                    v.get('content') or '',
-                                    v.get('created_at') or now_ts(),
-                                    v.get('parent_version_id'),
-                                )
-                            )
-                        compute_current_version(conn, pid)
-                    conn.commit()
+                    apply_import_payload(conn, data)
                     flash('已导入并覆盖所有数据', 'success')
                 except json.JSONDecodeError:
                     flash('导入失败：JSON 格式无效', 'error')
                 except ValueError as e:
                     flash(str(e), 'error')
                 except Exception:
+                    logger.exception("Import failed")
                     flash('导入失败，请重试', 'error')
         conn.close()
         return redirect(url_for('settings'))
@@ -1238,13 +1656,23 @@ def export_all():
         nxt = nxt.rstrip('?')
         conn.close()
         return redirect(url_for('login', next=nxt))
+    export_format = (request.args.get('format') or 'json').lower()
+    if export_format == 'zip':
+        bio = build_zip_export(conn)
+        conn.close()
+        return send_file(
+            bio,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name='prompts_backup.zip',
+        )
     data = collect_export_payload(conn)
     conn.close()
-    export_format = (request.args.get('format') or 'json').lower()
     if export_format == 'csv':
         fieldnames = [
             'id', 'name', 'source', 'notes', 'color', 'tags', 'image_data', 'pinned',
-            'require_password', 'created_at', 'updated_at', 'current_version_id', 'versions'
+            'cover_alt', 'cover_focus_x', 'cover_focus_y', 'require_password',
+            'created_at', 'updated_at', 'current_version_id', 'versions'
         ]
         sio = StringIO()
         writer = csv.DictWriter(sio, fieldnames=fieldnames)
@@ -1258,6 +1686,9 @@ def export_all():
                 'color': p.get('color'),
                 'tags': json.dumps(p.get('tags') or [], ensure_ascii=False),
                 'image_data': p.get('image_data'),
+                'cover_alt': p.get('cover_alt'),
+                'cover_focus_x': p.get('cover_focus_x'),
+                'cover_focus_y': p.get('cover_focus_y'),
                 'pinned': '1' if p.get('pinned') else '0',
                 'require_password': '1' if p.get('require_password') else '0',
                 'created_at': p.get('created_at'),
