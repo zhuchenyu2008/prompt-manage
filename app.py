@@ -229,9 +229,23 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
     SESSION_COOKIE_SECURE=os.environ.get('SESSION_COOKIE_SECURE') == '1',
+    SEND_FILE_MAX_AGE_DEFAULT=31536000,
 )
 # Jinja 过滤器：JSON 反序列化
 app.jinja_env.filters['loads'] = json.loads
+
+
+def static_asset(filename):
+    """Build a cache-busted URL for a file in the static directory."""
+    asset_path = os.path.join(app.static_folder, *filename.split('/'))
+    try:
+        version = int(os.path.getmtime(asset_path))
+    except OSError:
+        version = 0
+    return url_for('static', filename=filename, v=version)
+
+
+app.jinja_env.globals['static_asset'] = static_asset
 
 # === 简易国际化（无第三方依赖） ===
 # 通过 settings 表中的 key=language 控制全局语言，默认 zh。
