@@ -1305,13 +1305,19 @@
       .search-controls .sort-select {
         width: 100%;
         min-width: 0;
-        font-size: var(--font-size-sm);
+        font-size: clamp(10px, 3.5vw, var(--font-size-sm));
+        padding-left: clamp(8px, 3vw, var(--spacing-md));
+        padding-right: clamp(24px, 8vw, 32px);
       }
 
       .filter-select {
         width: 100%;
         min-width: 0;
         flex: none;
+      }
+
+      .filter-select::after {
+        right: clamp(8px, 3vw, var(--spacing-md));
       }
       
       .search-btn {
